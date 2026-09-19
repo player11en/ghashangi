@@ -123,6 +123,81 @@
       </section>
 
       <section class="group">
+        <h2 class="group-title">Materials <span class="count" id="materialCount"></span></h2>
+
+        <ul class="material-list" id="materialList" role="listbox" aria-label="Materials"></ul>
+
+        <div id="materialControls" hidden>
+          <div class="row">
+            <label for="matColor">Base colour</label>
+            <input type="color" id="matColor" value="#ffffff">
+            <output for="matColor" id="matColorOut">#ffffff</output>
+          </div>
+          <!-- Colour multiplies the base texture rather than replacing it, so
+               this dial slides from the authored look to a full tint without
+               destroying the map's shading and detail. -->
+          <div class="row">
+            <label for="matBlend">Blend</label>
+            <input type="range" id="matBlend" min="0" max="1" step="0.01" value="1">
+            <output for="matBlend" id="matBlendOut">100%</output>
+          </div>
+          <div class="row" data-channel="metalness">
+            <label for="matMetalness">Metalness</label>
+            <input type="range" id="matMetalness" min="0" max="1" step="0.01" value="0">
+            <output for="matMetalness" id="matMetalnessOut">0.00</output>
+          </div>
+          <div class="row" data-channel="roughness">
+            <label for="matRoughness">Roughness</label>
+            <input type="range" id="matRoughness" min="0" max="1" step="0.01" value="1">
+            <output for="matRoughness" id="matRoughnessOut">1.00</output>
+          </div>
+          <div class="row" data-channel="emissive">
+            <label for="matEmissive">Emissive</label>
+            <input type="color" id="matEmissive" value="#000000">
+            <output for="matEmissive" id="matEmissiveOut">#000000</output>
+          </div>
+          <div class="row" data-channel="emissiveIntensity">
+            <label for="matEmissiveIntensity">Glow</label>
+            <input type="range" id="matEmissiveIntensity" min="0" max="5" step="0.05" value="1">
+            <output for="matEmissiveIntensity" id="matEmissiveIntensityOut">1.00</output>
+          </div>
+          <div class="row" data-channel="opacity">
+            <label for="matOpacity">Opacity</label>
+            <input type="range" id="matOpacity" min="0" max="1" step="0.01" value="1">
+            <output for="matOpacity" id="matOpacityOut">1.00</output>
+          </div>
+
+          <div class="row row-buttons">
+            <button type="button" id="resetMaterial" class="button button-quiet">Reset</button>
+            <button type="button" id="resetAllMaterials" class="button button-quiet">Reset all</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Colourways</h2>
+        <ul class="colorway-list" id="colorwayList"></ul>
+        <p class="hint" id="colorwayHint">Recolour the materials above, then save the result as a colourway.</p>
+
+        <form id="colorwayForm" class="url-form">
+          <div class="url-field">
+            <input type="text" id="colorwayName" placeholder="Name, e.g. Red" autocomplete="off" maxlength="40">
+            <button type="submit" class="button">Save</button>
+          </div>
+        </form>
+
+        <div class="row">
+          <label for="exportScope">Export</label>
+          <select id="exportScope">
+            <option value="all" selected>All colourways</option>
+            <option value="current">Current view only</option>
+          </select>
+        </div>
+        <button type="button" id="exportPngs" class="button">Export PNGs</button>
+        <button type="button" id="exportGlb" class="button button-quiet">Export GLB</button>
+      </section>
+
+      <section class="group">
         <h2 class="group-title">Lighting</h2>
         <div class="row">
           <label for="ambientSlider">Ambient</label>

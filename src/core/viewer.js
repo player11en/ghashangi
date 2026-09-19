@@ -45,6 +45,16 @@ import { createEnvironment } from './environment.js';
 import { disposeObject } from './dispose.js';
 import { measure, normalizeObject, frameCamera } from './frame.js';
 import { createOrientation } from './orientation.js';
+import {
+  collectMaterials,
+  setBaseColor,
+  setChannel,
+  setEmissive,
+  resetMaterial,
+  resetAll,
+  captureState,
+  applyState,
+} from './materials.js';
 
 /** Upper bound on device pixel ratio. Above 2 the cost is real and the gain is not. */
 const MAX_PIXEL_RATIO = 2;
@@ -194,6 +204,22 @@ export function createViewer({ container }) {
   let userScale = 1;
   let userHeight = 0;
 
+  // collectMaterials walks the whole graph, and the UI reads the list on every
+  // selection change, so cache it and drop the cache when the model changes.
+  let materialCache = null;
+
+  /**
+   * After any material edit: redraw, and re-render the shadow map.
+   *
+   * Opacity and emissive both change what a mesh contributes to the shadow
+   * map, and shadows here are rendered on demand (shadow.autoUpdate = false),
+   * so without this a material change would leave a stale shadow behind.
+   */
+  function afterMaterialChange() {
+    lights.requestShadowUpdate();
+    loop.invalidate(2);
+  }
+
   /** Apply the scale and height sliders on top of the baked normalisation. */
   function applyUserTransform() {
     modelRoot.scale.setScalar(userScale);
@@ -255,6 +281,7 @@ export function createViewer({ container }) {
     orientRoot.position.set(0, 0, 0);
     orientRoot.add(object);
     current = object;
+    materialCache = null;
 
     refreshBounds();
     applyUserTransform();
@@ -287,6 +314,7 @@ export function createViewer({ container }) {
       disposeObject(current, { protect: [environment.environmentTexture] });
       current = null;
       currentBounds = null;
+      materialCache = null;
     }
     loop.invalidate();
   }
@@ -460,6 +488,70 @@ export function createViewer({ container }) {
 
     /** World-space bounds of any object in the scene. Used by tests and the HUD. */
     measure,
+
+    // --- materials ---------------------------------------------------------
+    // Cached per load, because collectMaterials walks the whole graph and the
+    // UI asks for the list on every selection change.
+
+    /** Unique materials on the current model. */
+    get materials() {
+      if (!materialCache) materialCache = collectMaterials(current);
+      return materialCache;
+    },
+
+    /** Look one up by the stable key from materialKey(). */
+    materialByKey(key) {
+      return this.materials.find((entry) => entry.key === key) ?? null;
+    },
+
+    setMaterialColor(key, color, blend = 1) {
+      const entry = this.materialByKey(key);
+      if (!entry) return false;
+      setBaseColor(entry.material, color, blend);
+      afterMaterialChange();
+      return true;
+    },
+
+    setMaterialChannel(key, channel, value) {
+      const entry = this.materialByKey(key);
+      if (!entry) return false;
+      const ok = setChannel(entry.material, channel, value);
+      if (ok) afterMaterialChange();
+      return ok;
+    },
+
+    setMaterialEmissive(key, color) {
+      const entry = this.materialByKey(key);
+      if (!entry) return false;
+      setEmissive(entry.material, color);
+      afterMaterialChange();
+      return true;
+    },
+
+    resetMaterial(key) {
+      const entry = this.materialByKey(key);
+      if (!entry) return false;
+      resetMaterial(entry.material);
+      afterMaterialChange();
+      return true;
+    },
+
+    resetAllMaterials() {
+      resetAll(this.materials);
+      afterMaterialChange();
+    },
+
+    /** Snapshot every material's state — what a colourway stores. */
+    captureMaterialState() {
+      return captureState(this.materials);
+    },
+
+    /** Re-apply a snapshot. */
+    applyMaterialState(state) {
+      const result = applyState(this.materials, state);
+      afterMaterialChange();
+      return result;
+    },
 
     setModel,
     clearModel,

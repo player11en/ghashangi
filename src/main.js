@@ -4,6 +4,7 @@ import { createViewer } from './core/viewer.js';
 import { createToasts } from './ui/toast.js';
 import { createProgress, formatBytes } from './ui/progress.js';
 import { createFileSource } from './sources/file.js';
+import { createMaterialsPanel } from './ui/materials-panel.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
 import {
   loadModel,
@@ -36,6 +37,8 @@ const progress = createProgress({
 });
 
 viewer.start();
+
+const materialsPanel = createMaterialsPanel({ viewer, toasts });
 
 // The filesystem backing the current model, kept so its blob URLs can be
 // revoked when the next model replaces it.
@@ -76,7 +79,7 @@ async function loadFromFiles(files) {
       onProgress: (fraction) => progress.update(fraction),
     });
 
-    install(object, animations, fs);
+    install(object, animations, fs, primary.name);
 
     const extra = files.length > 1 ? ` (+${files.length - 1} linked files)` : '';
     toasts.info(`Loaded ${primary.name}${extra}`);
@@ -89,7 +92,7 @@ async function loadFromFiles(files) {
 }
 
 /** Swap in a freshly loaded object and retire the previous one's resources. */
-function install(object, animations, fs) {
+function install(object, animations, fs, name = 'model') {
   viewer.setModel(object, { animations });
   currentFs?.dispose();
   currentFs = fs ?? null;
@@ -97,6 +100,8 @@ function install(object, animations, fs) {
   // setModel resets orientation to the new file's authored pose; the sliders
   // have to follow or they would show the previous model's correction.
   syncOrientationUI();
+  // Rebuild the material list and reattach this model's saved colourways.
+  materialsPanel.refresh(name);
 }
 
 /** Turn a loader failure into something a person can act on. */
@@ -138,7 +143,7 @@ async function loadBundled(url, label) {
       renderer: viewer.renderer,
       onProgress: (fraction) => progress.update(fraction),
     });
-    install(object, animations, null);
+    install(object, animations, null, url.split('/').pop());
     return object;
   } catch (error) {
     reportLoadFailure(error, label, extension);
@@ -262,7 +267,7 @@ async function loadFromLink(input) {
       onProgress: (fraction) => progress.update(fraction, `Parsing ${name}`),
     });
 
-    install(object, animations, null);
+    install(object, animations, null, name);
     // The loader has the geometry now; the blob behind the URL can go.
     revokeObjectUrl(objectUrl);
     objectUrl = null;
@@ -454,6 +459,7 @@ setInterval(() => {
 // from pixels. Not exposed in a plain production load.
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   window.__viewer = viewer;
+  window.__materials = materialsPanel;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;
   window.__loadLink = loadFromLink;
