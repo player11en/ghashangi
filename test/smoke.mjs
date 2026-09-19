@@ -101,9 +101,27 @@ check(
 
 const { createHash } = await import('node:crypto');
 
+/**
+ * Hash the rendered image.
+ *
+ * Deliberately not `page.screenshot()` or `locator.screenshot()`. Both drive
+ * Chromium's compositor capture path, which under software rendering
+ * (SwiftShader) intermittently never returns for a WebGL canvas fed by an
+ * on-demand `setAnimationLoop` — the capture waits for a frame commit that a
+ * deliberately idle render loop has no reason to produce.
+ *
+ * The viewer's own captureScreenshot() renders and reads back inside one
+ * synchronous task, which is exactly the guarantee needed here. It also means
+ * these assertions exercise the same code path the app's Screenshot button
+ * uses, so a regression in capture shows up as a test failure rather than
+ * silently passing.
+ */
 async function viewportHash() {
-  const buffer = await page.locator('canvas').screenshot();
-  return createHash('sha1').update(buffer).digest('hex');
+  const bytes = await page.evaluate(async () => {
+    const blob = await window.__viewer.captureScreenshot({ scale: 1 });
+    return [...new Uint8Array(await blob.arrayBuffer())];
+  });
+  return createHash('sha1').update(Buffer.from(bytes)).digest('hex');
 }
 
 /** Set a light via the viewer, let it render, and report whether pixels moved. */
@@ -165,6 +183,102 @@ check(
   'subject rests on the ground plane',
   Math.abs(grounded.minY) < grounded.radius * 0.02,
   `base at y=${grounded.minY.toFixed(4)}`,
+);
+
+// --- S1: orientation -----------------------------------------------------
+
+// Nothing in the original touched model rotation, so a Z-up export (Blender,
+// 3ds Max, most CAD, most STL) loaded on its side permanently. The subtle part
+// is not the rotation itself but staying grounded: frame.js rests the base on
+// y = 0, and rotating afterwards swings half the model below the stage floor
+// unless it is re-grounded.
+
+const orientation = await page.evaluate(() => {
+  const v = window.__viewer;
+  const read = () => ({
+    angles: v.orientation.angles,
+    preset: v.orientation.preset,
+    minY: v.measure(v.modelRoot).box.min.y,
+    size: v.measure(v.modelRoot).size.toArray(),
+  });
+
+  const authored = read();
+  v.orientation.setUpAxis('z');
+  const zUp = read();
+  v.orientation.reset();
+  const afterReset = read();
+
+  return { authored, zUp, afterReset };
+});
+
+check(
+  'up-axis Z rotates the model',
+  orientation.zUp.angles.x === -90,
+  `x=${orientation.zUp.angles.x}°, preset=${orientation.zUp.preset}`,
+);
+check(
+  'up-axis Z keeps the base on the floor',
+  Math.abs(orientation.zUp.minY) < 0.01,
+  `base at y=${orientation.zUp.minY.toFixed(4)}`,
+);
+check(
+  'up-axis Z swaps the Y and Z extents',
+  Math.abs(orientation.zUp.size[1] - orientation.authored.size[2]) < 0.01,
+  `${orientation.authored.size.map((n) => n.toFixed(1))} -> ${orientation.zUp.size.map((n) => n.toFixed(1))}`,
+);
+check(
+  'reset returns to the authored pose',
+  orientation.afterReset.angles.x === 0 &&
+    orientation.afterReset.angles.y === 0 &&
+    orientation.afterReset.angles.z === 0 &&
+    Math.abs(orientation.afterReset.size[1] - orientation.authored.size[1]) < 0.01,
+  `preset=${orientation.afterReset.preset}`,
+);
+
+// A free rotation on an arbitrary angle must ground just as well as a preset.
+const tilted = await page.evaluate(() => {
+  const v = window.__viewer;
+  v.orientation.setAxis('x', 37);
+  const minY = v.measure(v.modelRoot).box.min.y;
+  v.orientation.reset();
+  return minY;
+});
+check('an arbitrary tilt still rests on the floor', Math.abs(tilted) < 0.01, `base at y=${tilted.toFixed(4)}`);
+
+// The reason orientation needs its own group: auto-rotate writes
+// modelRoot.rotation.y every frame, so a user Y-rotation sharing that Euler
+// would be overwritten continuously.
+const coexist = await page.evaluate(async () => {
+  const v = window.__viewer;
+  v.orientation.setAxis('y', 45);
+  v.setAutoRotate(true);
+  await new Promise((r) => setTimeout(r, 400));
+  v.setAutoRotate(false);
+  const result = {
+    orientationY: v.orientation.angles.y,
+    spun: Math.abs(v.modelRoot.rotation.y) > 0.01,
+    minY: v.measure(v.modelRoot).box.min.y,
+  };
+  v.orientation.reset();
+  v.modelRoot.rotation.set(0, 0, 0);
+  return result;
+});
+
+check(
+  'auto-rotate does not clobber orientation',
+  coexist.orientationY === 45 && coexist.spun,
+  `orientation Y still ${coexist.orientationY}°, spin applied`,
+);
+check(
+  'model stays grounded while spinning',
+  Math.abs(coexist.minY) < 0.01,
+  `base at y=${coexist.minY.toFixed(4)}`,
+);
+
+await imageChangesWhen(
+  'orientation',
+  () => { window.__viewer.orientation.setUpAxis('z'); window.__viewer.loop.invalidate(3); },
+  () => { window.__viewer.orientation.reset(); window.__viewer.loop.invalidate(3); },
 );
 
 // --- B2: one loop, and it idles ------------------------------------------
@@ -248,8 +362,11 @@ check('screenshot produces a PNG', shot.type === 'image/png' && shot.size > 1000
 // --- reference image -----------------------------------------------------
 
 await mkdir(ARTIFACT_DIR, { recursive: true });
-const reference = await page.locator('canvas').screenshot();
-await writeFile(`${ARTIFACT_DIR}/viewport.png`, reference);
+const reference = await page.evaluate(async () => {
+  const blob = await window.__viewer.captureScreenshot({ scale: 1 });
+  return [...new Uint8Array(await blob.arrayBuffer())];
+});
+await writeFile(`${ARTIFACT_DIR}/viewport.png`, Buffer.from(reference));
 console.log(`\nReference image written to ${ARTIFACT_DIR}/viewport.png`);
 
 // --- report --------------------------------------------------------------

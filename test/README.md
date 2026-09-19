@@ -24,11 +24,27 @@ The `?debug` is needed against a production build: `src/main.js` only exposes
 | `links.mjs` | Drive id extraction from every share-link shape; Dropbox/GitHub rewriting; filename parsing. Pure logic, run in-page so Vite resolves `import.meta.env`. | no |
 | `smoke.mjs` | The app boots with no console errors; model loads and is framed; every light slider changes rendered pixels; shadows render and track the sun; the loop idles at rest and wakes on interaction; nothing leaks across reloads; screenshots encode. | no |
 | `remote.mjs` | Four real models over the network, including a Draco-compressed `.gltf` with external `.bin` and textures. Plus the failure paths: 404, CORS rejection, malformed URL, unconfigured Drive. | yes |
-| `inspect.mjs` | Not a test — dumps scene state and writes `artifacts/stage-on.png` / `stage-off.png`. For eyeballing a change. | no |
+| `inspect.mjs` | Not a test — renders the model in several orientation states to `artifacts/*.png` and dumps scene state. For eyeballing a change. | no |
+| `errors.mjs` | Not a test — prints whatever the page logs or throws on load, and checks the canvas is not stuck in a resize loop. First thing to run when something breaks. | no |
 
 `smoke.mjs` writes `artifacts/viewport.png` on every run. Keep a copy before a
 change that should not alter the image, and compare afterwards to catch
 lighting or colour-space drift.
+
+## Why not Playwright screenshots
+
+Image comparisons hash the output of the viewer's own `captureScreenshot()`,
+not `page.screenshot()` or `locator.screenshot()`.
+
+Both Playwright paths drive Chromium's compositor capture, which under software
+rendering (SwiftShader) intermittently never returns for a WebGL canvas fed by
+an on-demand `setAnimationLoop` — the capture waits for a frame commit that a
+deliberately idle render loop has no reason to produce. It manifests as a
+30-second timeout partway through a run.
+
+`captureScreenshot()` renders and reads back inside a single synchronous task,
+which is exactly the guarantee needed, and has the side benefit that these
+assertions exercise the same code path the Screenshot button uses.
 
 ## Why pixel comparisons
 

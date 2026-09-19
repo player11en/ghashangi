@@ -94,6 +94,9 @@ function install(object, animations, fs) {
   currentFs?.dispose();
   currentFs = fs ?? null;
   refreshStats();
+  // setModel resets orientation to the new file's authored pose; the sliders
+  // have to follow or they would show the previous model's correction.
+  syncOrientationUI();
 }
 
 /** Turn a loader failure into something a person can act on. */
@@ -327,6 +330,55 @@ bindCheckbox('stageToggle', (on) => viewer.setStageVisible(on));
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
+
+// Orientation
+//
+// The viewer owns the angles (it has to re-ground the model after every
+// change), so the controls push changes in and then read the result back out
+// rather than keeping their own copy. That keeps the sliders honest when a
+// preset or a nudge changes an axis the user did not touch.
+const AXES = ['x', 'y', 'z'];
+
+function syncOrientationUI() {
+  const { angles, preset } = viewer.orientation;
+
+  for (const axis of AXES) {
+    const slider = $(`rot${axis.toUpperCase()}`);
+    const output = $(`rot${axis.toUpperCase()}Out`);
+    slider.value = String(Math.round(angles[axis]));
+    output.textContent = `${Math.round(angles[axis])}°`;
+  }
+
+  for (const button of document.querySelectorAll('.seg[data-up]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.up === preset));
+  }
+}
+
+for (const axis of AXES) {
+  $(`rot${axis.toUpperCase()}`).addEventListener('input', (event) => {
+    viewer.orientation.setAxis(axis, parseFloat(event.target.value));
+    syncOrientationUI();
+  });
+}
+
+for (const button of document.querySelectorAll('.nudge[data-axis]')) {
+  button.addEventListener('click', () => {
+    viewer.orientation.nudge(button.dataset.axis, parseFloat(button.dataset.delta));
+    syncOrientationUI();
+  });
+}
+
+for (const button of document.querySelectorAll('.seg[data-up]')) {
+  button.addEventListener('click', () => {
+    viewer.orientation.setUpAxis(button.dataset.up);
+    syncOrientationUI();
+  });
+}
+
+$('resetOrientation').addEventListener('click', () => {
+  viewer.orientation.reset();
+  syncOrientationUI();
+});
 
 // Lighting
 bindSlider('ambientSlider', (v) => viewer.lights.setAmbient(v), fixed2);

@@ -66,11 +66,35 @@ export function measure(object) {
 }
 
 /**
- * Scale an object so its largest dimension is `targetSize`, centre it
- * horizontally on the origin, and rest its base on y = 0.
+ * Centre an object horizontally on the origin and rest its base on y = 0.
  *
  * Resting on the ground rather than centring on the origin is what makes the
  * stage model and the shadow catcher line up without per-model fiddling.
+ *
+ * Adjusts `object.position`, so whatever rotation or scale it carries is left
+ * alone. That is what lets this be re-run: rotating a grounded object swings
+ * part of it below the floor, and calling this again settles it back down
+ * without disturbing the orientation that caused it.
+ *
+ * @param {import('three').Object3D} object
+ * @returns {{size: Vector3, center: Vector3}|null} null if there is no geometry.
+ */
+export function groundObject(object) {
+  const { center, box, size, isEmpty } = measure(object);
+  if (isEmpty) return null;
+
+  object.position.x -= center.x;
+  object.position.z -= center.z;
+  object.position.y -= box.min.y;
+  object.updateWorldMatrix(true, true);
+
+  // Re-measure so callers get the settled bounds, not the pre-move ones.
+  const settled = measure(object);
+  return { size: settled.size, center: settled.center };
+}
+
+/**
+ * Scale an object so its largest dimension is `targetSize`, then ground it.
  *
  * The transform is written onto `object` itself. Keep user-facing scale and
  * position on the parent group so the two never fight.
@@ -80,7 +104,7 @@ export function measure(object) {
  * @returns {{scale: number, size: Vector3, originalSize: Vector3}}
  */
 export function normalizeObject(object, { targetSize = TARGET_SIZE } = {}) {
-  const { size, box, isEmpty } = measure(object);
+  const { size, isEmpty } = measure(object);
 
   // A model with no renderable geometry (an empty scene graph, a file that
   // parsed but produced nothing) has no meaningful scale. Leave it alone
@@ -94,15 +118,11 @@ export function normalizeObject(object, { targetSize = TARGET_SIZE } = {}) {
 
   object.scale.multiplyScalar(scale);
 
-  // Recompute after scaling rather than scaling the old numbers: the object may
+  // Ground after scaling rather than scaling the old numbers: the object may
   // have had a non-identity transform of its own before we touched it.
-  const scaled = measure(object);
-  object.position.x -= scaled.center.x;
-  object.position.z -= scaled.center.z;
-  object.position.y -= scaled.box.min.y;
-  object.updateWorldMatrix(true, true);
+  const settled = groundObject(object);
 
-  return { scale, size: scaled.size, originalSize: size };
+  return { scale, size: settled?.size ?? size, originalSize: size };
 }
 
 /**

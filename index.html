@@ -84,6 +84,45 @@
       </section>
 
       <section class="group">
+        <h2 class="group-title">Orientation</h2>
+        <!-- Presets first: Z-up is what Blender, 3ds Max, most CAD kernels and
+             most STLs export, so one click fixes the usual "it loaded on its
+             side" case without anyone hunting for 90 degrees on a slider. -->
+        <div class="row">
+          <label id="upAxisLabel">Up axis</label>
+          <div class="segmented" role="group" aria-labelledby="upAxisLabel">
+            <button type="button" class="seg" data-up="y" aria-pressed="true">Y</button>
+            <button type="button" class="seg" data-up="z" aria-pressed="false">Z</button>
+            <button type="button" class="seg" data-up="x" aria-pressed="false">X</button>
+          </div>
+        </div>
+
+        <div class="row row-axis">
+          <label for="rotX">Rotate X</label>
+          <button type="button" class="nudge" data-axis="x" data-delta="-90" aria-label="Rotate X minus 90 degrees">−90</button>
+          <input type="range" id="rotX" min="-180" max="180" step="1" value="0">
+          <button type="button" class="nudge" data-axis="x" data-delta="90" aria-label="Rotate X plus 90 degrees">+90</button>
+          <output for="rotX" id="rotXOut">0°</output>
+        </div>
+        <div class="row row-axis">
+          <label for="rotY">Rotate Y</label>
+          <button type="button" class="nudge" data-axis="y" data-delta="-90" aria-label="Rotate Y minus 90 degrees">−90</button>
+          <input type="range" id="rotY" min="-180" max="180" step="1" value="0">
+          <button type="button" class="nudge" data-axis="y" data-delta="90" aria-label="Rotate Y plus 90 degrees">+90</button>
+          <output for="rotY" id="rotYOut">0°</output>
+        </div>
+        <div class="row row-axis">
+          <label for="rotZ">Rotate Z</label>
+          <button type="button" class="nudge" data-axis="z" data-delta="-90" aria-label="Rotate Z minus 90 degrees">−90</button>
+          <input type="range" id="rotZ" min="-180" max="180" step="1" value="0">
+          <button type="button" class="nudge" data-axis="z" data-delta="90" aria-label="Rotate Z plus 90 degrees">+90</button>
+          <output for="rotZ" id="rotZOut">0°</output>
+        </div>
+
+        <button type="button" id="resetOrientation" class="button button-quiet">Reset orientation</button>
+      </section>
+
+      <section class="group">
         <h2 class="group-title">Lighting</h2>
         <div class="row">
           <label for="ambientSlider">Ambient</label>

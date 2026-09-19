@@ -183,6 +183,55 @@ body {
   font-size: 13px;
 }
 
+/* label | −90 | slider | +90 | readout */
+.row-axis {
+  grid-template-columns: 4.2rem auto 1fr auto 2.4rem;
+  gap: 5px;
+}
+
+.nudge {
+  padding: 3px 5px;
+  font: inherit;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.nudge:hover { color: var(--text); background: var(--border); }
+
+/* --- segmented (up-axis) ------------------------------------------------ */
+
+.segmented {
+  display: flex;
+  grid-column: 2 / -1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.seg {
+  flex: 1;
+  padding: 5px 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface-raised);
+  border: 0;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+}
+.seg:last-child { border-right: 0; }
+.seg:hover { color: var(--text); }
+
+.seg[aria-pressed='true'] {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
 /* --- controls ----------------------------------------------------------- */
 
 .button {

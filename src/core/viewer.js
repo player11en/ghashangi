@@ -44,6 +44,7 @@ import { createLightRig } from './lights.js';
 import { createEnvironment } from './environment.js';
 import { disposeObject } from './dispose.js';
 import { measure, normalizeObject, frameCamera } from './frame.js';
+import { createOrientation } from './orientation.js';
 
 /** Upper bound on device pixel ratio. Above 2 the cost is real and the gain is not. */
 const MAX_PIXEL_RATIO = 2;
@@ -112,13 +113,24 @@ export function createViewer({ container }) {
   controls.zoomSpeed = 2;
   controls.target.set(0, 0.5, 0);
 
-  // The user's scale and height sliders drive this group. The loaded object
-  // inside it carries the normalisation transform from frame.js, so the two
-  // never overwrite each other — which is exactly what went wrong before, where
-  // the scale slider wrote straight over the (unused) computed fit.
+  // Three nested transforms, each owned by exactly one thing, so none of them
+  // can overwrite another:
+  //
+  //   modelRoot    user scale + height, and the auto-rotate spin
+  //     orientRoot user X/Y/Z orientation, re-grounded after each change
+  //       object   the normalisation scale baked in by frame.js
+  //
+  // The original collapsed all of this onto the loaded object, which is why the
+  // scale slider wrote straight over the (unused) computed fit. Auto-rotate
+  // still spins modelRoot.rotation.y, so orientation needs its own group or the
+  // spin would overwrite it every frame.
   const modelRoot = new Group();
   modelRoot.name = 'modelRoot';
   scene.add(modelRoot);
+
+  const orientRoot = new Group();
+  orientRoot.name = 'orientRoot';
+  modelRoot.add(orientRoot);
 
   const stageRoot = new Group();
   stageRoot.name = 'stageRoot';
@@ -191,6 +203,32 @@ export function createViewer({ container }) {
   }
 
   /**
+   * Re-measure the subject and refit everything that is sized against it.
+   *
+   * Called on load and after any orientation change: rotating a model changes
+   * its footprint, so the shadow camera and the backdrop both need resizing or
+   * the shadow clips and the stage no longer fits.
+   */
+  function refreshBounds() {
+    const m = measure(modelRoot);
+    currentBounds = { radius: m.sphere.radius, center: m.sphere.center, size: m.size };
+    lights.fitTo(modelRoot, currentBounds);
+    fitStage();
+    return currentBounds;
+  }
+
+  // Orientation lives on its own group so the auto-rotate spin on
+  // modelRoot.rotation.y can never overwrite it.
+  const orientation = createOrientation({
+    target: orientRoot,
+    onChange() {
+      refreshBounds();
+      lights.requestShadowUpdate();
+      loop.invalidate(2);
+    },
+  });
+
+  /**
    * Install a freshly loaded object as the subject.
    *
    * @param {import('three').Object3D} object
@@ -211,13 +249,14 @@ export function createViewer({ container }) {
     });
 
     modelRoot.rotation.set(0, 0, 0);
-    modelRoot.add(object);
+    // Orientation belongs to the file, not the session: a new model starts in
+    // the pose it was authored in rather than inheriting the last one's fix.
+    orientation.resetSilently();
+    orientRoot.position.set(0, 0, 0);
+    orientRoot.add(object);
     current = object;
 
-    const m = measure(modelRoot);
-    currentBounds = { radius: m.sphere.radius, center: m.sphere.center, size: m.size };
-
-    lights.fitTo(modelRoot, currentBounds);
+    refreshBounds();
     applyUserTransform();
 
     if (frame) frameCamera(camera, controls, modelRoot, { keepDirection: false });
@@ -402,10 +441,12 @@ export function createViewer({ container }) {
     controls,
     canvas,
     modelRoot,
+    orientRoot,
     stageRoot,
     lights,
     environment,
     loop,
+    orientation,
 
     get model() {
       return current;
