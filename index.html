@@ -6,9 +6,9 @@
   <!-- B20: the original pinned maximum-scale=1.0, user-scalable=no, which
        blocks pinch zoom for anyone who needs to magnify the UI. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Load a 3D model from your device, a URL or a Google Drive link, inspect it, light it and view it in AR.">
+  <meta name="description" content="Load a 3D model from your device, a URL or a Google Drive link. Fix its orientation, recolour its materials, light it, and export one image per colourway.">
   <meta name="color-scheme" content="dark light">
-  <title>3D Model Viewer</title>
+  <title>3D Model Studio</title>
   <link rel="stylesheet" href="./styles/main.css">
 </head>
 
@@ -286,6 +286,9 @@
         <dl class="stats" id="stats">
           <dt>FPS</dt><dd id="statFps">—</dd>
           <dt>Triangles</dt><dd id="statTris">—</dd>
+          <dt>Vertices</dt><dd id="statVerts">—</dd>
+          <dt>Meshes</dt><dd id="statMeshes">—</dd>
+          <dt>Materials</dt><dd id="statMaterials">—</dd>
           <dt>Draw calls</dt><dd id="statCalls">—</dd>
           <dt>Textures</dt><dd id="statTextures">—</dd>
         </dl>

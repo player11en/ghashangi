@@ -439,7 +439,18 @@ $('panelToggle').addEventListener('click', (event) => {
 
 function refreshStats() {
   const { render, memory } = viewer.renderer.info;
-  $('statTris').textContent = render.triangles.toLocaleString();
+  const stats = viewer.modelStats;
+
+  // Triangles come from the model's geometry, not renderer.info.render.triangles
+  // — the latter reports what the last frame drew, which under frustum culling
+  // and on-demand rendering is a different number, and includes the stage and
+  // the shadow pass. It reported Duck.glb as 28,962 against a real 4,212.
+  $('statTris').textContent = stats.triangles.toLocaleString();
+  $('statVerts').textContent = stats.vertices.toLocaleString();
+  $('statMeshes').textContent = String(stats.meshes);
+  $('statMaterials').textContent = String(stats.materials);
+
+  // Draw calls genuinely are a per-frame property, so renderer.info is right here.
   $('statCalls').textContent = String(render.calls);
   $('statTextures').textContent = String(memory.textures);
 }

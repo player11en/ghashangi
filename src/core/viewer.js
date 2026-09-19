@@ -207,6 +207,53 @@ export function createViewer({ container }) {
   // collectMaterials walks the whole graph, and the UI reads the list on every
   // selection change, so cache it and drop the cache when the model changes.
   let materialCache = null;
+  let statsCache = null;
+
+  /**
+   * Count what the model actually contains.
+   *
+   * Deliberately not `renderer.info.render.triangles`: that reports what the
+   * last frame drew, which under frustum culling and on-demand rendering is not
+   * the model's size. Reading it as "triangles" overstated Duck.glb as 28,962
+   * against a real 4,212 — it was also counting the stage and shadow passes.
+   *
+   * renderer.info is still right for draw calls, which genuinely are a
+   * per-frame property.
+   */
+  function computeModelStats() {
+    const stats = { triangles: 0, vertices: 0, meshes: 0, materials: 0 };
+    if (!current) return stats;
+
+    const geometries = new Set();
+    const materials = new Set();
+
+    current.traverse((node) => {
+      if (!node.isMesh && !node.isPoints && !node.isLine) return;
+      stats.meshes++;
+
+      for (const m of Array.isArray(node.material) ? node.material : [node.material]) {
+        if (m) materials.add(m);
+      }
+
+      const geometry = node.geometry;
+      // Count shared geometry once for vertices, but every instance's triangles,
+      // since an instance really is that much on screen.
+      const position = geometry?.attributes?.position;
+      if (!position) return;
+
+      if (!geometries.has(geometry)) {
+        geometries.add(geometry);
+        stats.vertices += position.count;
+      }
+      if (node.isMesh) {
+        stats.triangles += (geometry.index ? geometry.index.count : position.count) / 3;
+      }
+    });
+
+    stats.triangles = Math.round(stats.triangles);
+    stats.materials = materials.size;
+    return stats;
+  }
 
   /**
    * After any material edit: redraw, and re-render the shadow map.
@@ -282,6 +329,7 @@ export function createViewer({ container }) {
     orientRoot.add(object);
     current = object;
     materialCache = null;
+    statsCache = null;
 
     refreshBounds();
     applyUserTransform();
@@ -315,6 +363,7 @@ export function createViewer({ container }) {
       current = null;
       currentBounds = null;
       materialCache = null;
+      statsCache = null;
     }
     loop.invalidate();
   }
@@ -497,6 +546,15 @@ export function createViewer({ container }) {
     get materials() {
       if (!materialCache) materialCache = collectMaterials(current);
       return materialCache;
+    },
+
+    /**
+     * What the model contains: triangles, vertices, meshes, materials.
+     * Derived from geometry, not from the last frame drawn.
+     */
+    get modelStats() {
+      if (!statsCache) statsCache = computeModelStats();
+      return statsCache;
     },
 
     /** Look one up by the stable key from materialKey(). */
