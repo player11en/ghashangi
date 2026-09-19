@@ -1,0 +1,202 @@
+// The light rig behind the six sliders.
+//
+// Two bugs lived here.
+//
+// B3: the rig uses two RectAreaLights ("Left Light" / "Right Light"), but
+// RectAreaLight is the one three light type that needs a lookup table uploaded
+// before it shades correctly, via RectAreaLightUniformsLib.init(). That call was
+// missing, so both of those sliders moved a number that never reached the image.
+// Two of the six lighting controls were simply dead.
+//
+// B4: the shadow-catcher plane was added with `model.add(plane)` from *inside*
+// `model.traverse()`, so it was added once per descendant node, and it parented
+// to the model — meaning the scale and height sliders dragged the ground plane
+// around with the subject. It belongs to the scene, once.
+//
+// Light *positions* are also now derived from the subject's bounds. The old rig
+// hardcoded y=5..6 and a radius of 6, which was tuned for one particular model
+// at its authored scale; with models normalised to a consistent size, the rig
+// has to scale with them or the lights end up inside the geometry.
+
+import {
+  AmbientLight,
+  DirectionalLight,
+  RectAreaLight,
+  Mesh,
+  PlaneGeometry,
+  ShadowMaterial,
+  MathUtils,
+  Object3D,
+} from 'three';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { fitShadowCamera, TARGET_SIZE } from './frame.js';
+
+// Defaults carried over from the original HTML slider values, so the rig looks
+// like the app people already know.
+export const LIGHT_DEFAULTS = {
+  ambient: 0.3,
+  sun: 1.8,
+  left: 4.5,
+  right: 2.1,
+  exposure: 0.6,
+  angle: 53, // degrees, drives the sun's position around the subject
+};
+
+// RectAreaLightUniformsLib.init() uploads a shared BRDF lookup table. Doing it
+// more than once is wasteful, and doing it not at all is B3.
+let uniformsLibReady = false;
+function ensureRectAreaLightUniforms() {
+  if (uniformsLibReady) return;
+  RectAreaLightUniformsLib.init();
+  uniformsLibReady = true;
+}
+
+/**
+ * Build the light rig and add it to the scene.
+ *
+ * @param {import('three').Scene} scene
+ * @returns {object} handles and setters; every setter returns void and expects
+ *   the caller to invalidate the render loop.
+ */
+export function createLightRig(scene) {
+  ensureRectAreaLightUniforms();
+
+  // Nominal radius the rig is designed at. fitTo() rescales from here.
+  let rigRadius = TARGET_SIZE * 0.75;
+
+  const ambient = new AmbientLight(0xffffff, LIGHT_DEFAULTS.ambient);
+  scene.add(ambient);
+
+  const sun = new DirectionalLight(0xffffff, LIGHT_DEFAULTS.sun);
+  sun.castShadow = true;
+  // 2048 rather than the old 1024: with the shadow camera now fitted to the
+  // subject instead of a fixed +/-10 box, the extra resolution is actually
+  // spent on the model.
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  // normalBias is the right tool for shadow acne on curved surfaces; the old
+  // code used only a constant bias of -0.001, which trades acne for peter-
+  // panning. A small constant bias on top handles flat coplanar cases.
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.02;
+  // Static scene: the shadow map is re-rendered only when something asks for
+  // it (see requestShadowUpdate), not on every frame.
+  sun.shadow.autoUpdate = false;
+  sun.shadow.needsUpdate = true;
+  scene.add(sun);
+
+  // DirectionalLight aims at its .target, which must be in the scene graph for
+  // its world matrix to update.
+  const sunTarget = new Object3D();
+  scene.add(sunTarget);
+  sun.target = sunTarget;
+
+  const left = new RectAreaLight(0xb2b2ff, LIGHT_DEFAULTS.left, 5, 5);
+  scene.add(left);
+
+  const right = new RectAreaLight(0xff9898, LIGHT_DEFAULTS.right, 6, 6);
+  scene.add(right);
+
+  // Ground plane that catches shadows without being visible itself. Hidden by
+  // default because Stage.glb normally plays that role; AR turns it on, since
+  // there is no stage in a passthrough scene.
+  const shadowCatcher = new Mesh(
+    new PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+    new ShadowMaterial({ opacity: 0.5 }),
+  );
+  shadowCatcher.receiveShadow = true;
+  shadowCatcher.visible = false;
+  // It never moves relative to the scene, so it does not need a per-frame
+  // matrix recompute.
+  shadowCatcher.matrixAutoUpdate = false;
+  scene.add(shadowCatcher);
+
+  let angle = LIGHT_DEFAULTS.angle;
+
+  /** Place the sun on a circle around the subject at `angle` degrees. */
+  function applySunPosition() {
+    const rad = MathUtils.degToRad(angle);
+    sun.position.set(
+      rigRadius * Math.cos(rad),
+      rigRadius * 0.85,
+      rigRadius * Math.sin(rad),
+    );
+  }
+
+  /** Place the two fill lights relative to the rig radius. */
+  function applyFillPositions() {
+    left.position.set(-rigRadius * 0.5, rigRadius, rigRadius * 0.17);
+    left.width = rigRadius * 0.85;
+    left.height = rigRadius * 0.85;
+    left.lookAt(0, rigRadius * 0.25, 0);
+
+    right.position.set(rigRadius * 0.67, rigRadius, rigRadius * 0.33);
+    right.width = rigRadius;
+    right.height = rigRadius;
+    right.lookAt(0, rigRadius * 0.25, 0);
+  }
+
+  applySunPosition();
+  applyFillPositions();
+
+  /**
+   * Rescale and re-aim the rig for a newly loaded subject, and fit the shadow
+   * camera and ground plane to it.
+   *
+   * @param {import('three').Object3D} object
+   * @param {{radius:number, center:import('three').Vector3}} bounds
+   */
+  function fitTo(object, bounds) {
+    rigRadius = Math.max(bounds.radius * 1.5, 0.5);
+    applySunPosition();
+    applyFillPositions();
+
+    // Ground plane just larger than the subject's footprint.
+    const span = Math.max(bounds.radius * 6, 1);
+    shadowCatcher.scale.set(span, 1, span);
+    shadowCatcher.position.set(bounds.center.x, 0, bounds.center.z);
+    shadowCatcher.updateMatrix();
+
+    fitShadowCamera(sun, object);
+  }
+
+  /** Re-render the shadow map on the next frame. */
+  function requestShadowUpdate() {
+    sun.shadow.needsUpdate = true;
+  }
+
+  return {
+    ambient,
+    sun,
+    left,
+    right,
+    shadowCatcher,
+    fitTo,
+    requestShadowUpdate,
+
+    setAmbient(v) {
+      ambient.intensity = v;
+    },
+    setSun(v) {
+      sun.intensity = v;
+      requestShadowUpdate();
+    },
+    setLeft(v) {
+      left.intensity = v;
+    },
+    setRight(v) {
+      right.intensity = v;
+    },
+    setAngle(degrees) {
+      angle = degrees;
+      applySunPosition();
+      requestShadowUpdate();
+    },
+    getAngle() {
+      return angle;
+    },
+    setShadowCatcherVisible(visible) {
+      shadowCatcher.visible = visible;
+    },
+  };
+}

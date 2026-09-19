@@ -1,119 +1,176 @@
-<!-- To Do  -->
-<!-- Change logic --- Apple should not Create ARbutton and Run AR Module -->
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- B20: the original pinned maximum-scale=1.0, user-scalable=no, which
+       blocks pinch zoom for anyone who needs to magnify the UI. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Load a 3D model from your device, a URL or a Google Drive link, inspect it, light it and view it in AR.">
+  <meta name="color-scheme" content="dark light">
   <title>3D Model Viewer</title>
-  <script src='https://html2canvas.hertzen.com/dist/html2canvas.min.js'></script>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./styles/main.css">
 </head>
 
 <body>
-  <div id="dropArea" class="open">
-    <img src="" alt="">
-    <span>Drop file or click to upload</span>
-    <br>
-    <span style="opacity: 0.75; font-size: 12px; text-align: center;">supported formats are fbx and glb</span>
-    <br>
-    <span style="opacity: 0.75; font-size: 10px; text-align: center;">only usdz (using usda)</span>
-    <input type="file" id="myfile" hidden>
-  </div>
-  <button class="button buttonClose" style="position: absolute; left: 50%; transform: translateX(-50%);">
-    <img src="./arrow.png" class="arrow" alt="">
-  </button>
+  <!-- The renderer's canvas is created by the viewer and appended here. -->
+  <main id="viewport" aria-label="3D viewport"></main>
 
-
-  <a id="link" rel="ar" href="" download="asset.usdz">
-    <img id="button">
-    <button id="AppleARButton">View in AR</button>
-  </a>
-
-  <!-- Import maps polyfill -->
-  <!-- Remove this when import maps will be widely supported -->
-  <button id="screenshotButton" class="custom-button">Take Screenshot</button>
-  <button id="toggleStageButton" class="custom-button">Toogle Stage</button>
-  <button id="resetButton" class="custom-button">Reset Cam</button>
-  <button id="rotateButton" class="custom-button">Auto-Rotation</button>
-  <button id="toogleLightSetButton" class="custom-button">Light Settings</button>
-  <div id="container">
-    <label for="scaleSlider">Scale</label>
-    <input type="range" class="Slider" id="scaleSlider" min="0.1" max="2" step="0.1" value="1">
-    <label for="heightSlider">YPos</label>
-    <input type="range" class="Slider" id="heightSlider" min="-15" max="15" step="0.1" value="0.5">
-  </div>
-  <div id="container2">
-    <h2>Lights</h2>
-    <div class="slider-container">
-      <label for="lightSlider">Ambient Light</label>
-      <input type="range" class="Slider" id="lightSlider" min="0" max="3" step="0.1" value="0.3">
-    </div>
-    <div class="slider-container">
-      <label for="lightSlider2">Sun Light</label>
-      <input type="range" class="Slider" id="lightSlider2" min="0" max="5" step="0.1" value="1.8">
-    </div>
-    <div class="slider-container">
-      <label for="lightSlider3">Left Light</label>
-      <input type="range" class="Slider" id="lightSlider3" min="0" max="30" step="0.1" value="4.5">
-    </div>
-    <div class="slider-container">
-      <label for="lightSlider4">Right Light</label>
-      <input type="range" class="Slider" id="lightSlider4" min="0" max="30" step="0.1" value="2.1">
-    </div>
-    <div class="slider-container">
-      <label for="lightSlider5">World Light</label>
-      <input type="range" class="Slider" id="lightSlider5" min="0" max="3" step="0.1" value="0.6">
-    </div>
-    <div class="slider-container">
-      <label for="lightSlider6">Light Position</label>
-      <input type="range" class="Slider" id="lightSlider6" min="-90" max="270" step="0.1" value="53">
-    </div>
-    <label for="toggleShadowsCheckbox">Toggle Shadows:</label>
-    <input type="checkbox" id="toggleShadowsCheckbox" checked>
+  <div id="loading" class="loading" hidden role="status" aria-live="polite">
+    <div class="loading-bar"><div class="loading-fill" id="loadingFill"></div></div>
+    <p class="loading-label" id="loadingLabel">Loading…</p>
   </div>
 
-  <div id="modal" class="modal">
-    <div class="modal-content">
-      <span class="closer">&times;</span>
-      <h2 class="modal-title">Welcome to 3D Model Viewer</h2>
-      <p class="modal-content-text">
-        <span style="color:rgb(255, 200, 98)">!!!This is a work in progress!!!</span>
-        <br><br>
-        Upload your 3D files, look at them, adjust the light, make screenshots.
-        <br>
-        We have a AR-system running on Android mobile.
-        <br> <br>
-        Supported file formats are: <b>.fbx, .glb</b>
-        <br>
-        not optimized: <b>.obj (no color or single texture), .usdz (only saved with usda)</b>
-        <br>
-        <br>
-        more updates formats will come soon!
-        <br>
-        Feel free to explore and enjoy the immersive experience!
-      </p>
+  <div id="toasts" class="toasts" role="log" aria-live="polite" aria-relevant="additions"></div>
 
-      <div class="button-container">
-        <button id="acceptBtn">Got it</button>
-      </div>
+  <aside id="panel" class="panel" aria-label="Viewer controls">
+    <header class="panel-head">
+      <h1 class="panel-title">3D Model Viewer</h1>
+      <button type="button" id="panelToggle" class="icon-button" aria-expanded="true"
+              aria-controls="panelBody" title="Collapse panel">−</button>
+    </header>
+
+    <div class="panel-body" id="panelBody">
+      <section class="group">
+        <h2 class="group-title">Load</h2>
+        <button type="button" id="openFile" class="button">Choose file…</button>
+        <p class="hint">…or drop a file anywhere on the page.</p>
+        <input type="file" id="fileInput" class="visually-hidden"
+               accept=".glb,.gltf,.fbx,.obj,.mtl,.stl,.usdz,.usda,.usdc,.usd,.bin,image/*" multiple>
+        <button type="button" id="loadDemo" class="button button-quiet">Load demo model</button>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Model</h2>
+        <div class="row">
+          <label for="scaleSlider">Scale</label>
+          <input type="range" id="scaleSlider" min="0.1" max="3" step="0.05" value="1">
+          <output for="scaleSlider" id="scaleOut">1.00×</output>
+        </div>
+        <div class="row">
+          <label for="heightSlider">Height</label>
+          <input type="range" id="heightSlider" min="-15" max="15" step="0.1" value="0">
+          <output for="heightSlider" id="heightOut">0.0</output>
+        </div>
+        <div class="row row-buttons">
+          <button type="button" id="frameButton" class="button button-quiet">Frame</button>
+          <button type="button" id="resetButton" class="button button-quiet">Reset cam</button>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="autoRotate">
+          <label for="autoRotate">Auto-rotate</label>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="stageToggle" checked>
+          <label for="stageToggle">Show stage</label>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="wireframe">
+          <label for="wireframe">Wireframe</label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Lighting</h2>
+        <div class="row">
+          <label for="ambientSlider">Ambient</label>
+          <input type="range" id="ambientSlider" min="0" max="3" step="0.05" value="0.3">
+          <output for="ambientSlider" id="ambientOut">0.30</output>
+        </div>
+        <div class="row">
+          <label for="sunSlider">Sun</label>
+          <input type="range" id="sunSlider" min="0" max="5" step="0.05" value="1.8">
+          <output for="sunSlider" id="sunOut">1.80</output>
+        </div>
+        <div class="row">
+          <label for="leftSlider">Left fill</label>
+          <input type="range" id="leftSlider" min="0" max="30" step="0.1" value="4.5">
+          <output for="leftSlider" id="leftOut">4.5</output>
+        </div>
+        <div class="row">
+          <label for="rightSlider">Right fill</label>
+          <input type="range" id="rightSlider" min="0" max="30" step="0.1" value="2.1">
+          <output for="rightSlider" id="rightOut">2.1</output>
+        </div>
+        <div class="row">
+          <label for="angleSlider">Sun angle</label>
+          <input type="range" id="angleSlider" min="-90" max="270" step="1" value="53">
+          <output for="angleSlider" id="angleOut">53°</output>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="shadowToggle" checked>
+          <label for="shadowToggle">Shadows</label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Environment</h2>
+        <div class="row">
+          <label for="exposureSlider">Exposure</label>
+          <input type="range" id="exposureSlider" min="0" max="3" step="0.05" value="0.6">
+          <output for="exposureSlider" id="exposureOut">0.60</output>
+        </div>
+        <div class="row">
+          <label for="envIntensity">Env intensity</label>
+          <input type="range" id="envIntensity" min="0" max="3" step="0.05" value="1">
+          <output for="envIntensity" id="envIntensityOut">1.00</output>
+        </div>
+        <div class="row">
+          <label for="envRotation">Env rotation</label>
+          <input type="range" id="envRotation" min="0" max="360" step="1" value="0">
+          <output for="envRotation" id="envRotationOut">0°</output>
+        </div>
+        <div class="row">
+          <label for="toneMapping">Tone mapping</label>
+          <select id="toneMapping">
+            <option value="agx" selected>AgX</option>
+            <option value="neutral">Neutral</option>
+            <option value="aces">ACES Filmic</option>
+            <option value="reinhard">Reinhard</option>
+            <option value="cineon">Cineon</option>
+            <option value="linear">Linear</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="bgToggle" checked>
+          <label for="bgToggle">Show background</label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Capture</h2>
+        <div class="row row-buttons">
+          <button type="button" id="screenshotButton" class="button">Screenshot</button>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="shotTransparent">
+          <label for="shotTransparent">Transparent background</label>
+        </div>
+        <div class="row">
+          <label for="shotScale">Resolution</label>
+          <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
+          <output for="shotScale" id="shotScaleOut">1×</output>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Stats</h2>
+        <dl class="stats" id="stats">
+          <dt>FPS</dt><dd id="statFps">—</dd>
+          <dt>Triangles</dt><dd id="statTris">—</dd>
+          <dt>Draw calls</dt><dd id="statCalls">—</dd>
+          <dt>Textures</dt><dd id="statTextures">—</dd>
+        </dl>
+      </section>
     </div>
+  </aside>
+
+  <div id="dropOverlay" class="drop-overlay" hidden aria-hidden="true">
+    <p>Drop to load</p>
   </div>
 
-
-  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.154.0/examples/jsm/"
-      }
-    }
-  </script>
-  <script src="script.js" type="module"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 
 </html>

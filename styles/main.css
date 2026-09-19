@@ -1,0 +1,454 @@
+/* 3D Model Viewer — interface styles.
+ *
+ * Replaces the original stylesheet, which positioned every control with a
+ * hardcoded `bottom:` pixel offset (25px, 65px, 105px, 165px, 205px…). That
+ * stack collided with itself on any short viewport and had to be re-tuned by
+ * hand in a media query. Controls now live in one scrolling panel, so adding a
+ * control does not require picking a new pixel offset for it.
+ */
+
+:root {
+  color-scheme: dark light;
+
+  --bg: #0b0c0f;
+  --surface: #16181d;
+  --surface-raised: #1e2128;
+  --border: #2c3039;
+  --text: #e8eaed;
+  --text-dim: #9aa0aa;
+  --accent: #4a9eff;
+  --accent-hover: #6fb3ff;
+  --accent-text: #08111c;
+  --danger: #ff6b6b;
+  --warn: #ffc862;
+
+  --radius: 8px;
+  --radius-sm: 5px;
+  --gap: 12px;
+  --panel-width: 300px;
+
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #eef0f4;
+    --surface: #ffffff;
+    --surface-raised: #f4f6f9;
+    --border: #d4d8e0;
+    --text: #1a1d23;
+    --text-dim: #5b626d;
+    --accent: #0b68d9;
+    --accent-text: #ffffff;
+    --shadow: 0 8px 24px rgb(15 20 30 / 0.16);
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* The `hidden` attribute is applied by the UA stylesheet as `[hidden]{display:none}`,
+ * which any author rule setting `display` outranks. .drop-overlay sets
+ * `display: grid`, so `overlay.hidden = true` had no visible effect and the
+ * "Drop to load" overlay sat on top of the viewport permanently. Make the
+ * attribute authoritative instead of remembering to special-case it per rule. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  /* Avoid the browser's pull-to-refresh fighting a vertical orbit drag. */
+  overscroll-behavior: none;
+}
+
+/* --- viewport ------------------------------------------------------------ */
+
+#viewport {
+  position: fixed;
+  inset: 0;
+  /* The canvas handles its own gestures; without this a vertical drag scrolls
+     the page on touch instead of orbiting. */
+  touch-action: none;
+}
+
+.viewer-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- control panel ------------------------------------------------------- */
+
+.panel {
+  position: fixed;
+  top: var(--gap);
+  right: var(--gap);
+  width: var(--panel-width);
+  max-height: calc(100dvh - var(--gap) * 2);
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  flex: 0 0 auto;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.panel-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 12px 12px;
+}
+
+.panel[data-collapsed='true'] .panel-body { display: none; }
+
+.group {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.group:last-child { border-bottom: 0; }
+
+.group-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+/* --- rows --------------------------------------------------------------- */
+
+.row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 3rem;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.row:last-child { margin-bottom: 0; }
+
+.row > label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.row output {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.row-check {
+  grid-template-columns: auto 1fr;
+}
+.row-check > label {
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* --- controls ----------------------------------------------------------- */
+
+.button {
+  width: 100%;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.button:hover { background: var(--accent-hover); }
+
+.button-quiet {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+.button-quiet:hover { background: var(--border); }
+
+.button + .button { margin-top: 8px; }
+.row-buttons .button + .button { margin-top: 0; }
+
+.button[disabled],
+input[disabled],
+select[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-button {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.icon-button:hover { color: var(--text); background: var(--surface); }
+
+select {
+  width: 100%;
+  padding: 5px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  grid-column: 2 / -1;
+}
+
+input[type='range'] {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.hint {
+  margin: 6px 0 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* A visible, consistent focus ring. The original had none at all, so the whole
+   interface was unusable by keyboard. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- stats -------------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.stats dt { color: var(--text-dim); }
+.stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* --- loading ------------------------------------------------------------ */
+
+.loading {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(340px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+.loading-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+/* Indeterminate: a file read or a server that sent no Content-Length. */
+.loading-fill[data-indeterminate='true'] {
+  width: 35%;
+  animation: indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+
+.loading-label {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- toasts ------------------------------------------------------------- */
+
+.toasts {
+  position: fixed;
+  left: var(--gap);
+  bottom: var(--gap);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - var(--gap) * 2));
+  z-index: 30;
+}
+
+.toast {
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  animation: toast-in 160ms ease;
+}
+
+.toast[data-level='error'] { border-left-color: var(--danger); }
+.toast[data-level='warn']  { border-left-color: var(--warn); }
+
+.toast-title { font-weight: 600; }
+.toast-detail {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- drop overlay ------------------------------------------------------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 3px dashed var(--accent);
+  font-size: 20px;
+  font-weight: 600;
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* --- reduced motion ----------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- narrow viewports --------------------------------------------------- */
+
+@media (max-width: 720px) {
+  :root { --panel-width: auto; }
+
+  .panel {
+    top: auto;
+    left: var(--gap);
+    right: var(--gap);
+    /* Clear of the iOS home indicator and Android gesture bar. */
+    bottom: max(var(--gap), env(safe-area-inset-bottom));
+    max-height: 55dvh;
+  }
+
+  .panel[data-collapsed='true'] { max-height: none; }
+
+  .loading {
+    bottom: auto;
+    top: var(--gap);
+  }
+
+  .toasts {
+    left: var(--gap);
+    right: var(--gap);
+    bottom: auto;
+    top: 64px;
+    width: auto;
+  }
+}
