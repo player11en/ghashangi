@@ -1,0 +1,119 @@
+<!-- To Do  -->
+<!-- Change logic --- Apple should not Create ARbutton and Run AR Module -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D Model Viewer</title>
+  <script src='https://html2canvas.hertzen.com/dist/html2canvas.min.js'></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div id="dropArea" class="open">
+    <img src="" alt="">
+    <span>Drop file or click to upload</span>
+    <br>
+    <span style="opacity: 0.75; font-size: 12px; text-align: center;">supported formats are fbx and glb</span>
+    <br>
+    <span style="opacity: 0.75; font-size: 10px; text-align: center;">only usdz (using usda)</span>
+    <input type="file" id="myfile" hidden>
+  </div>
+  <button class="button buttonClose" style="position: absolute; left: 50%; transform: translateX(-50%);">
+    <img src="./arrow.png" class="arrow" alt="">
+  </button>
+
+
+  <a id="link" rel="ar" href="" download="asset.usdz">
+    <img id="button">
+    <button id="AppleARButton">View in AR</button>
+  </a>
+
+  <!-- Import maps polyfill -->
+  <!-- Remove this when import maps will be widely supported -->
+  <button id="screenshotButton" class="custom-button">Take Screenshot</button>
+  <button id="toggleStageButton" class="custom-button">Toogle Stage</button>
+  <button id="resetButton" class="custom-button">Reset Cam</button>
+  <button id="rotateButton" class="custom-button">Auto-Rotation</button>
+  <button id="toogleLightSetButton" class="custom-button">Light Settings</button>
+  <div id="container">
+    <label for="scaleSlider">Scale</label>
+    <input type="range" class="Slider" id="scaleSlider" min="0.1" max="2" step="0.1" value="1">
+    <label for="heightSlider">YPos</label>
+    <input type="range" class="Slider" id="heightSlider" min="-15" max="15" step="0.1" value="0.5">
+  </div>
+  <div id="container2">
+    <h2>Lights</h2>
+    <div class="slider-container">
+      <label for="lightSlider">Ambient Light</label>
+      <input type="range" class="Slider" id="lightSlider" min="0" max="3" step="0.1" value="0.3">
+    </div>
+    <div class="slider-container">
+      <label for="lightSlider2">Sun Light</label>
+      <input type="range" class="Slider" id="lightSlider2" min="0" max="5" step="0.1" value="1.8">
+    </div>
+    <div class="slider-container">
+      <label for="lightSlider3">Left Light</label>
+      <input type="range" class="Slider" id="lightSlider3" min="0" max="30" step="0.1" value="4.5">
+    </div>
+    <div class="slider-container">
+      <label for="lightSlider4">Right Light</label>
+      <input type="range" class="Slider" id="lightSlider4" min="0" max="30" step="0.1" value="2.1">
+    </div>
+    <div class="slider-container">
+      <label for="lightSlider5">World Light</label>
+      <input type="range" class="Slider" id="lightSlider5" min="0" max="3" step="0.1" value="0.6">
+    </div>
+    <div class="slider-container">
+      <label for="lightSlider6">Light Position</label>
+      <input type="range" class="Slider" id="lightSlider6" min="-90" max="270" step="0.1" value="53">
+    </div>
+    <label for="toggleShadowsCheckbox">Toggle Shadows:</label>
+    <input type="checkbox" id="toggleShadowsCheckbox" checked>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="closer">&times;</span>
+      <h2 class="modal-title">Welcome to 3D Model Viewer</h2>
+      <p class="modal-content-text">
+        <span style="color:rgb(255, 200, 98)">!!!This is a work in progress!!!</span>
+        <br><br>
+        Upload your 3D files, look at them, adjust the light, make screenshots.
+        <br>
+        We have a AR-system running on Android mobile.
+        <br> <br>
+        Supported file formats are: <b>.fbx, .glb</b>
+        <br>
+        not optimized: <b>.obj (no color or single texture), .usdz (only saved with usda)</b>
+        <br>
+        <br>
+        more updates formats will come soon!
+        <br>
+        Feel free to explore and enjoy the immersive experience!
+      </p>
+
+      <div class="button-container">
+        <button id="acceptBtn">Got it</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.154.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script src="script.js" type="module"></script>
+</body>
+
+</html>

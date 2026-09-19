@@ -1,0 +1,27 @@
+node_modules/
+dist/
+dist-ssr/
+
+# Local env files — VITE_GOOGLE_API_KEY lives here.
+# NOTE: Vite inlines VITE_* vars into the built bundle, so the key is public
+# in any deployment. The real protection is restricting it in Google Cloud
+# Console to the Drive API + your deployment's HTTP referrers.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+*.local
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.vite/
+.DS_Store
+Thumbs.db
+
+.vscode/*
+!.vscode/extensions.json
+.idea/
