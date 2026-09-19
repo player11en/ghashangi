@@ -377,6 +377,23 @@ input[type='checkbox'] {
   border: 0;
 }
 
+/* --- animation ---------------------------------------------------------- */
+
+.row-transport {
+  grid-template-columns: 1fr auto;
+}
+
+.row-transport .button {
+  width: auto;
+  padding: 6px 14px;
+  margin-top: 0;
+}
+
+.timeline {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
 /* --- materials ---------------------------------------------------------- */
 
 .count {

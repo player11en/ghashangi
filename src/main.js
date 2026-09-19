@@ -5,6 +5,7 @@ import { createToasts } from './ui/toast.js';
 import { createProgress, formatBytes } from './ui/progress.js';
 import { createFileSource } from './sources/file.js';
 import { createMaterialsPanel } from './ui/materials-panel.js';
+import { createAnimationPanel } from './ui/animation-panel.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
 import {
   loadModel,
@@ -39,6 +40,8 @@ const progress = createProgress({
 viewer.start();
 
 const materialsPanel = createMaterialsPanel({ viewer, toasts });
+// Registers its own viewer callbacks, so it rebuilds itself on every load.
+const animationPanel = createAnimationPanel({ viewer });
 
 // The filesystem backing the current model, kept so its blob URLs can be
 // revoked when the next model replaces it.

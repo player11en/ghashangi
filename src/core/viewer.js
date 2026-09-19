@@ -31,7 +31,6 @@ import {
   Scene,
   PerspectiveCamera,
   Group,
-  AnimationMixer,
   SRGBColorSpace,
   PCFShadowMap,
   DoubleSide,
@@ -45,6 +44,7 @@ import { createEnvironment } from './environment.js';
 import { disposeObject } from './dispose.js';
 import { measure, normalizeObject, frameCamera } from './frame.js';
 import { createOrientation } from './orientation.js';
+import { createAnimation } from './animation.js';
 import {
   collectMaterials,
   setBaseColor,
@@ -150,9 +150,14 @@ export function createViewer({ container }) {
 
   // --- render loop ---------------------------------------------------------
 
-  let mixer = null;
+  let animation = null;
   let autoRotate = false;
   let autoRotateSpeed = 0.3; // radians/second
+
+  // Notified whenever the clip list changes, so the UI can rebuild.
+  let onAnimationChange = () => {};
+  // Notified each frame while playing, so a scrubber can follow the playhead.
+  let animationTick = () => {};
 
   const loop = createRenderLoop({
     renderer,
@@ -161,11 +166,10 @@ export function createViewer({ container }) {
       // lets damping settle without pinning the loop to 60fps forever.
       if (controls.update(delta)) loop.invalidate();
 
-      if (mixer) {
-        mixer.update(delta);
-        // An animated model's shadow is stale the moment it moves.
-        lights.requestShadowUpdate();
-      }
+      // animation.update() advances only while playing, and marks the shadow
+      // map dirty itself — an animated model's shadow is stale the moment it
+      // moves.
+      animation?.update(delta);
 
       if (autoRotate) {
         modelRoot.rotation.y += autoRotateSpeed * delta;
@@ -338,10 +342,19 @@ export function createViewer({ container }) {
 
     const clips = animations.length ? animations : (object.animations ?? []);
     if (clips.length > 0) {
-      mixer = new AnimationMixer(object);
-      mixer.clipAction(clips[0]).play();
-      loop.hold('animation');
+      animation = createAnimation({
+        root: object,
+        clips,
+        loop,
+        onShadowDirty: () => lights.requestShadowUpdate(),
+        onTick: (time, total) => animationTick(time, total),
+      });
+      // Select the first clip but leave it paused, so a model opens on a
+      // readable pose instead of immediately animating. Autoplay is the UI's
+      // decision, not this layer's.
+      animation.select(0);
     }
+    onAnimationChange();
 
     // A couple of frames so textures finishing their decode land on screen.
     loop.invalidate(3);
@@ -350,11 +363,9 @@ export function createViewer({ container }) {
 
   /** Remove and fully dispose the current subject. */
   function clearModel() {
-    if (mixer) {
-      mixer.stopAllAction();
-      mixer.uncacheRoot(mixer.getRoot());
-      mixer = null;
-      loop.release('animation');
+    if (animation) {
+      animation.dispose();
+      animation = null;
     }
     if (current) {
       // The environment texture is assigned to materials as envMap by three; it
@@ -531,8 +542,19 @@ export function createViewer({ container }) {
     get bounds() {
       return currentBounds;
     },
-    get mixer() {
-      return mixer;
+    /** Playback controller for the current model, or null if it has no clips. */
+    get animation() {
+      return animation;
+    },
+
+    /** Called when the clip list changes — i.e. on every model load. */
+    onAnimationChange(callback) {
+      onAnimationChange = callback ?? (() => {});
+    },
+
+    /** Called each frame while a clip is playing, so a scrubber can follow. */
+    onAnimationTick(callback) {
+      animationTick = callback ?? (() => {});
     },
 
     /** World-space bounds of any object in the scene. Used by tests and the HUD. */
