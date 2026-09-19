@@ -37,6 +37,19 @@
         <p class="hint">…or drop a file anywhere on the page.</p>
         <input type="file" id="fileInput" class="visually-hidden"
                accept=".glb,.gltf,.fbx,.obj,.mtl,.stl,.usdz,.usda,.usdc,.usd,.bin,image/*" multiple>
+
+        <form id="urlForm" class="url-form">
+          <label for="urlInput" class="url-label">From a link</label>
+          <div class="url-field">
+            <input type="url" id="urlInput" placeholder="Google Drive share link or direct URL"
+                   autocomplete="off" spellcheck="false">
+            <button type="submit" id="urlSubmit" class="button">Load</button>
+          </div>
+          <p class="hint" id="urlHint">
+            Google Drive, Dropbox, GitHub or any direct link.
+          </p>
+        </form>
+
         <button type="button" id="loadDemo" class="button button-quiet">Load demo model</button>
       </section>
 

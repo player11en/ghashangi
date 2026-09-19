@@ -33,6 +33,22 @@ export default defineConfig(({ mode }) => ({
     format: 'es',
   },
 
+  optimizeDeps: {
+    // DRACOLoader and KTX2Loader locate their wasm with
+    // `new URL('../libs/…', import.meta.url)`. Vite's dependency pre-bundling
+    // rewrites those modules into .vite/deps/, where that relative path does not
+    // exist — the request 404s, the dev server answers with index.html, and the
+    // decoder dies on `Unexpected token '<'` while the load hangs forever.
+    //
+    // Excluding them from pre-bundling means they are served from source in dev,
+    // so import.meta.url points at the real node_modules path. Production builds
+    // are unaffected (Rollup emits the wasm as hashed assets either way).
+    exclude: [
+      'three/addons/loaders/DRACOLoader.js',
+      'three/addons/loaders/KTX2Loader.js',
+    ],
+  },
+
   server: {
     // Large model files over the LAN; Vite's default is fine but be explicit
     // that we want the host exposed when --host is passed.

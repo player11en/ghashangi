@@ -269,6 +269,45 @@ input[type='checkbox'] {
   color: var(--text-dim);
 }
 
+.hint[data-level='error'] { color: var(--danger); }
+.hint[data-level='warn'] { color: var(--warn); }
+
+/* --- url loader --------------------------------------------------------- */
+
+.url-form { margin-top: 12px; }
+
+.url-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.url-field {
+  display: flex;
+  gap: 6px;
+}
+
+.url-field input[type='url'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.url-field input[type='url']::placeholder { color: var(--text-dim); }
+
+.url-field .button {
+  flex: 0 0 auto;
+  width: auto;
+  margin-top: 0;
+}
+
 /* A visible, consistent focus ring. The original had none at all, so the whole
    interface was unusable by keyboard. */
 :focus-visible {

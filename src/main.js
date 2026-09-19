@@ -5,8 +5,22 @@ import { createToasts } from './ui/toast.js';
 import { createProgress, formatBytes } from './ui/progress.js';
 import { createFileSource } from './sources/file.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
-import { loadModel, SUPPORTED_EXTENSIONS, UnsupportedFormatError } from './loaders/index.js';
+import {
+  loadModel,
+  needsSiblings,
+  SUPPORTED_EXTENSIONS,
+  UnsupportedFormatError,
+} from './loaders/index.js';
 import { DEFAULT_HDR } from './core/environment.js';
+import {
+  normalizeUrl,
+  filenameFromUrl,
+  fetchAsBlob,
+  InvalidUrlError,
+  RemoteFetchError,
+} from './sources/url.js';
+import { fetchFromDrive, looksLikeDriveLink, isDriveConfigured } from './sources/drive.js';
+import { trackObjectUrl, revokeObjectUrl } from './core/dispose.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -145,6 +159,137 @@ $('loadDemo').addEventListener('click', () => {
   loadBundled(DEMO_MODEL, 'demo model');
 });
 
+// --- remote sources: Drive links and direct URLs --------------------------
+
+const urlForm = $('urlForm');
+const urlInput = $('urlInput');
+const urlHint = $('urlHint');
+
+// Lets a second paste cancel the first download instead of racing it.
+let remoteAbort = null;
+
+function setHint(text, level) {
+  urlHint.textContent = text;
+  if (level) urlHint.dataset.level = level;
+  else delete urlHint.dataset.level;
+}
+
+const DEFAULT_HINT = isDriveConfigured()
+  ? 'Google Drive, Dropbox, GitHub or any direct link.'
+  : 'Dropbox, GitHub or any direct link. (Drive needs VITE_GOOGLE_API_KEY.)';
+
+setHint(DEFAULT_HINT);
+
+/**
+ * Load from a pasted link. Drive goes through the Drive API; everything else is
+ * a plain CORS fetch. Both end up as a Blob, so the loader path is identical to
+ * a local file's.
+ */
+async function loadFromLink(input) {
+  const trimmed = input.trim();
+  if (!trimmed) return;
+
+  remoteAbort?.abort();
+  remoteAbort = new AbortController();
+  const { signal } = remoteAbort;
+
+  const isDrive = looksLikeDriveLink(trimmed);
+  let objectUrl = null;
+
+  progress.begin(isDrive ? 'Contacting Google Drive…' : 'Downloading…');
+  setHint('Loading…');
+
+  try {
+    let blob;
+    let name;
+    // Directory the entry file came from, so a .gltf's .bin and textures can be
+    // fetched from the server even though the entry file itself is a blob.
+    let resourcePath;
+
+    if (isDrive) {
+      const result = await fetchFromDrive(trimmed, {
+        signal,
+        onProgress: (fraction, loaded, total) => {
+          progress.update(
+            fraction,
+            total ? `${formatBytes(loaded)} of ${formatBytes(total)}` : 'Downloading…',
+          );
+        },
+      });
+      blob = result.blob;
+      name = result.name;
+    } else {
+      const { url: direct, source } = normalizeUrl(trimmed);
+      name = filenameFromUrl(direct);
+      resourcePath = direct.slice(0, direct.lastIndexOf('/') + 1);
+      progress.update(null, `Downloading ${name}`);
+      blob = await fetchAsBlob(direct, {
+        signal,
+        onProgress: (fraction, loaded, total) => {
+          progress.update(
+            fraction,
+            total ? `${formatBytes(loaded)} of ${formatBytes(total)}` : `Downloading ${name}`,
+          );
+        },
+      });
+      if (source !== 'direct') {
+        console.info(`[3DMViewer] rewrote ${source} share link to a direct download`);
+      }
+    }
+
+    const extension = name.split('.').pop()?.toLowerCase() ?? '';
+    objectUrl = trackObjectUrl(blob);
+
+    // Drive addresses files by opaque id, so there is no directory a sibling
+    // could be fetched from. A .glb is fine (self-contained); a .gltf that
+    // references an external .bin cannot work, and saying so up front beats a
+    // confusing "Failed to load buffer" from deep inside the parser.
+    if (isDrive && needsSiblings(extension)) {
+      toasts.warn(
+        `.${extension} from Drive may be incomplete`,
+        'Drive cannot serve the linked .bin or texture files alongside it. Upload a self-contained .glb, or zip the folder and drop it in instead.',
+      );
+    }
+
+    const { object, animations } = await loadModel({
+      url: objectUrl,
+      extension,
+      renderer: viewer.renderer,
+      resourcePath,
+      onProgress: (fraction) => progress.update(fraction, `Parsing ${name}`),
+    });
+
+    install(object, animations, null);
+    // The loader has the geometry now; the blob behind the URL can go.
+    revokeObjectUrl(objectUrl);
+    objectUrl = null;
+
+    toasts.info(`Loaded ${name}`, `${formatBytes(blob.size)} from ${isDrive ? 'Google Drive' : 'link'}`);
+    setHint(DEFAULT_HINT);
+    urlInput.value = '';
+  } catch (error) {
+    if (objectUrl) revokeObjectUrl(objectUrl);
+
+    if (error.name === 'AbortError') return; // superseded by a newer request
+
+    if (error instanceof InvalidUrlError || error instanceof RemoteFetchError) {
+      // These already carry a human-readable explanation.
+      toasts.error(isDrive ? 'Could not load from Drive' : 'Could not load that link', error.message);
+      setHint(error.message, 'error');
+    } else {
+      reportLoadFailure(error, filenameFromUrl(trimmed), '');
+      setHint('That file could not be opened.', 'error');
+    }
+  } finally {
+    progress.end();
+  }
+}
+
+urlForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  loadFromLink(urlInput.value);
+});
+
 // --- control wiring ------------------------------------------------------
 
 /**
@@ -259,6 +404,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   window.__viewer = viewer;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;
+  window.__loadLink = loadFromLink;
 }
 
 // --- startup -------------------------------------------------------------

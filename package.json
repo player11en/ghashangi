@@ -9,7 +9,12 @@
     "dev:https": "vite --host --mode https",
     "build": "vite build",
     "preview": "vite preview",
-    "preview:https": "vite preview --host --mode https"
+    "preview:https": "vite preview --host --mode https",
+    "test": "node test/links.mjs && node test/smoke.mjs && node test/remote.mjs",
+    "test:links": "node test/links.mjs",
+    "test:smoke": "node test/smoke.mjs",
+    "test:remote": "node test/remote.mjs",
+    "test:inspect": "node test/inspect.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

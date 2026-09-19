@@ -31,25 +31,43 @@ function fractionOf(event) {
   return event.loaded / event.total;
 }
 
-async function loadGLTF({ url, manager, renderer, onProgress }) {
+/**
+ * Point a loader at the directory its sibling files live in.
+ *
+ * This is what makes a remote .gltf work. A .gltf is JSON that references
+ * "Avocado.bin" and "Avocado_baseColor.png" by relative path. We download the
+ * entry file to a Blob so the progress bar is real, but a blob: URL has no
+ * directory, so those relative references resolve to nothing and the load fails
+ * with `Failed to load buffer`. setResourcePath tells the loader to resolve
+ * siblings against the original server directory instead.
+ *
+ * Not needed for .glb, which embeds everything, nor for local drops, where
+ * fs-map.js resolves siblings through the LoadingManager.
+ */
+function applyResourcePath(loader, resourcePath) {
+  if (resourcePath) loader.setResourcePath(resourcePath);
+  return loader;
+}
+
+async function loadGLTF({ url, manager, renderer, resourcePath, onProgress }) {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-  const loader = new GLTFLoader(manager);
+  const loader = applyResourcePath(new GLTFLoader(manager), resourcePath);
   await attachDecoders(loader, renderer);
 
   const gltf = await loader.loadAsync(url, (e) => onProgress(fractionOf(e)));
   return { object: gltf.scene, animations: gltf.animations ?? [] };
 }
 
-async function loadFBX({ url, manager, onProgress }) {
+async function loadFBX({ url, manager, resourcePath, onProgress }) {
   const { FBXLoader } = await import('three/addons/loaders/FBXLoader.js');
-  const loader = new FBXLoader(manager);
+  const loader = applyResourcePath(new FBXLoader(manager), resourcePath);
   const object = await loader.loadAsync(url, (e) => onProgress(fractionOf(e)));
   return { object, animations: object.animations ?? [] };
 }
 
-async function loadOBJ({ url, manager, files, fs, onProgress }) {
+async function loadOBJ({ url, manager, files, fs, resourcePath, onProgress }) {
   const { OBJLoader } = await import('three/addons/loaders/OBJLoader.js');
-  const loader = new OBJLoader(manager);
+  const loader = applyResourcePath(new OBJLoader(manager), resourcePath);
 
   // OBJLoader does not follow the `mtllib` directive itself — it has to be
   // handed a materials object. Find a .mtl in the drop if there is one; textures
@@ -58,7 +76,8 @@ async function loadOBJ({ url, manager, files, fs, onProgress }) {
   if (mtlFile) {
     const { MTLLoader } = await import('three/addons/loaders/MTLLoader.js');
     const mtlUrl = fs.urlFor(mtlFile.webkitRelativePath || mtlFile.name);
-    const materials = await new MTLLoader(manager).loadAsync(mtlUrl);
+    const mtlLoader = applyResourcePath(new MTLLoader(manager), resourcePath);
+    const materials = await mtlLoader.loadAsync(mtlUrl);
     materials.preload();
     loader.setMaterials(materials);
   }
@@ -115,6 +134,9 @@ const HANDLERS = {
  * @param {import('three').WebGLRenderer} options.renderer
  * @param {File[]} [options.files]      The full drop, for multi-file formats.
  * @param {object} [options.fs]         createFileSystem() result.
+ * @param {string} [options.resourcePath] Directory to resolve sibling files
+ *   against, for a remote .gltf/.obj/.fbx downloaded to a blob. See
+ *   applyResourcePath.
  * @param {(fraction:number|null) => void} [options.onProgress]
  * @returns {Promise<{object: import('three').Object3D, animations: Array}>}
  */
@@ -125,13 +147,22 @@ export async function loadModel({
   renderer,
   files,
   fs,
+  resourcePath,
   onProgress = () => {},
 }) {
   const handler = HANDLERS[extension];
   if (!handler) {
     throw new UnsupportedFormatError(extension);
   }
-  return handler({ url, manager, renderer, files, fs, onProgress });
+  return handler({ url, manager, renderer, files, fs, resourcePath, onProgress });
+}
+
+/** Formats that embed all their data; everything else may need siblings. */
+const SELF_CONTAINED = new Set(['glb', 'usdz', 'stl']);
+
+/** Whether `extension` can reference external files. */
+export function needsSiblings(extension) {
+  return !SELF_CONTAINED.has(extension);
 }
 
 export class UnsupportedFormatError extends Error {
