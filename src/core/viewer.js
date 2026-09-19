@@ -159,6 +159,11 @@ export function createViewer({ container }) {
   // invalidate — see the assignment immediately after createRenderLoop.
   let post = null;
 
+  // A single per-frame hook, run at the end of update(). One slot rather than
+  // a listener list: it exists for exclusive takeovers like turntable
+  // recording, and two of those at once would fight over the same rotation.
+  let beforeRender = null;
+
   let animation = null;
   let autoRotate = false;
   let autoRotateSpeed = 0.3; // radians/second
@@ -184,6 +189,11 @@ export function createViewer({ container }) {
         modelRoot.rotation.y += autoRotateSpeed * delta;
         lights.requestShadowUpdate();
       }
+
+      // Last, so a hook can override anything above it. Used by turntable
+      // recording to drive rotation from elapsed time: the rotation the
+      // recorder captures is then always the rotation that was drawn.
+      beforeRender?.(delta);
     },
     render() {
       // post is assigned just below; it needs the loop's invalidate, and the
@@ -566,6 +576,15 @@ export function createViewer({ container }) {
     /** Ambient occlusion and antialiasing. See core/post.js. */
     get post() {
       return post;
+    },
+
+    /**
+     * Install a per-frame hook, or pass null to remove it. Runs last in the
+     * loop's update, so it can override auto-rotate. Exclusive: setting one
+     * replaces any previous hook.
+     */
+    onBeforeRender(callback) {
+      beforeRender = callback ?? null;
     },
 
     get model() {

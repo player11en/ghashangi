@@ -23,6 +23,7 @@ import {
 } from './sources/url.js';
 import { fetchFromDrive, looksLikeDriveLink, isDriveConfigured } from './sources/drive.js';
 import { trackObjectUrl, revokeObjectUrl } from './core/dispose.js';
+import { recordTurntable, isTurntableSupported } from './core/turntable.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -46,6 +47,9 @@ const animationPanel = createAnimationPanel({ viewer });
 // The filesystem backing the current model, kept so its blob URLs can be
 // revoked when the next model replaces it.
 let currentFs = null;
+
+// Used to name exported files after the model they came from.
+let currentModelName = 'model';
 
 // --- loading -------------------------------------------------------------
 
@@ -99,6 +103,7 @@ function install(object, animations, fs, name = 'model') {
   viewer.setModel(object, { animations });
   currentFs?.dispose();
   currentFs = fs ?? null;
+  currentModelName = name;
   refreshStats();
   // setModel resets orientation to the new file's authored pose; the sliders
   // have to follow or they would show the previous model's correction.
@@ -439,6 +444,53 @@ bindCheckbox('aaToggle', async (on) => {
 bindSlider('aoIntensity', (v) => viewer.post.setAOIntensity(v), fixed2);
 bindSlider('aoRadius', (v) => viewer.post.setAORadius(v), fixed2);
 syncPostRows();
+
+// Turntable
+bindSlider('ttRevolutions', () => {}, (v) => String(v));
+bindSlider('ttDuration', () => {}, (v) => `${v}s`);
+
+if (!isTurntableSupported()) {
+  // Safari has historically supported none of the WebM codecs. Say so rather
+  // than offering a button that fails.
+  $('recordTurntable').disabled = true;
+  $('turntableHint').textContent =
+    'This browser cannot record WebM. Try Chrome or Firefox, or use the colourway PNG export.';
+  $('turntableHint').dataset.level = 'warn';
+}
+
+$('recordTurntable').addEventListener('click', async () => {
+  const button = $('recordTurntable');
+  const label = button.textContent;
+  button.disabled = true;
+
+  try {
+    const blob = await recordTurntable({
+      viewer,
+      revolutions: parseInt($('ttRevolutions').value, 10),
+      duration: parseInt($('ttDuration').value, 10),
+      onProgress: (fraction) => {
+        button.textContent = `Recording ${Math.round(fraction * 100)}%`;
+      },
+    });
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${(currentModelName || 'model').replace(/\.[^.]+$/, '')}-turntable.webm`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+
+    toasts.info('Turntable recorded', formatBytes(blob.size));
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      console.error('[3DMViewer] turntable failed', error);
+      toasts.error('Could not record the turntable', String(error.message));
+    }
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+});
 
 // Capture
 bindSlider('shotScale', () => {}, (v) => `${v}×`);

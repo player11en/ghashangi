@@ -327,6 +327,25 @@
         </div>
       </section>
 
+      <section class="group" id="turntableGroup">
+        <h2 class="group-title">Turntable</h2>
+        <div class="row">
+          <label for="ttRevolutions">Revolutions</label>
+          <input type="range" id="ttRevolutions" min="1" max="4" step="1" value="1">
+          <output for="ttRevolutions" id="ttRevolutionsOut">1</output>
+        </div>
+        <div class="row">
+          <label for="ttDuration">Duration</label>
+          <input type="range" id="ttDuration" min="2" max="20" step="1" value="6">
+          <output for="ttDuration" id="ttDurationOut">6s</output>
+        </div>
+        <button type="button" id="recordTurntable" class="button">Record turntable</button>
+        <p class="hint" id="turntableHint">
+          Records a WebM. Note that WebM cannot carry transparency — use the
+          colourway PNG export if you need an alpha channel.
+        </p>
+      </section>
+
       <section class="group">
         <h2 class="group-title">Stats</h2>
         <dl class="stats" id="stats">

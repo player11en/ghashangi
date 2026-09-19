@@ -47,10 +47,15 @@ and this app deliberately does not compete there.
   actually has
 - Cyclorama backdrop, a five-light rig, shadows, AgX/ACES/Neutral tone mapping,
   HDR environment with rotation and intensity
+- **Ambient occlusion** (GTAO) and antialiasing (SMAA) — contact darkening is
+  what makes a product read as sitting on the backdrop rather than pasted onto
+  it. Off by default; the passes are only downloaded if you turn them on
+- Animation: clip list, play/pause, scrub, speed, loop
 
 **Output**
 - **Colourways**: save named material sets, switch between them, and export one
   PNG per colourway as a zip
+- **Turntable**: record a seamless-looping WebM of the model rotating
 - Screenshots up to 4×, with an optional transparent background
 - GLB export with material edits and the orientation fix baked in
 
@@ -135,8 +140,14 @@ npm run dev
 npm test
 ```
 
-Individual suites: `test:links`, `test:smoke`, `test:stats`, `test:materials`,
-`test:remote`. Diagnostics: `test:errors`, `test:inspect`, `test:ui`.
+Individual suites: `test:links`, `test:smoke`, `test:stats`, `test:animation`,
+`test:render`, `test:materials`, `test:remote`. Diagnostics: `test:errors`,
+`test:inspect`, `test:ui`.
+
+`npm run check` runs a static pass for identifiers used but never imported.
+Rollup treats an unresolved free identifier as a global rather than an error,
+so a missing import builds cleanly and then throws at runtime — this catches
+that. It runs automatically before every build.
 See [test/README.md](test/README.md) for what each covers and why image
 comparisons avoid Playwright's screenshot API.
 
@@ -157,8 +168,8 @@ certificate — a secure context is required.
 
 - **No AR.** Not built. WebXR hit-test and iOS Quick Look are both planned but
   unstarted.
-- **No animation controls yet.** A model's first clip autoplays; there is no
-  clip list, scrub or speed control.
+- **Turntables cannot be transparent.** WebM does not carry alpha reliably
+  across players. Use the colourway PNG export if you need an alpha channel.
 - **Only colourways persist.** Lighting, orientation and camera reset on reload.
 - **Assets are uncompressed.** The 4.3 MB demo model and 1.5 MB HDR both load
   eagerly; Draco/KTX2 and an UltraHDR environment would cut that substantially.
