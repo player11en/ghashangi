@@ -406,6 +406,40 @@ $('toneMapping').addEventListener('change', (event) => {
   viewer.environment.setToneMapping(event.target.value);
 });
 
+// Post-processing. The AO sliders are only meaningful once AO is on, so they
+// follow the toggle rather than sitting there inert.
+function syncPostRows() {
+  const on = $('aoToggle').checked;
+  for (const row of document.querySelectorAll('[data-ao]')) row.hidden = !on;
+}
+
+bindCheckbox('aoToggle', async (on) => {
+  // Reveal the sliders straight away; the composer's passes are imported on
+  // demand and the UI should not wait on a network round trip.
+  syncPostRows();
+  try {
+    await viewer.post.setAO(on);
+  } catch (error) {
+    console.error('[3DMViewer] ambient occlusion failed to initialise', error);
+    toasts.error('Could not enable ambient occlusion', String(error.message));
+    $('aoToggle').checked = false;
+    syncPostRows();
+  }
+});
+
+bindCheckbox('aaToggle', async (on) => {
+  try {
+    await viewer.post.setAA(on);
+  } catch (error) {
+    console.error('[3DMViewer] antialiasing failed to initialise', error);
+    toasts.error('Could not enable antialiasing', String(error.message));
+    $('aaToggle').checked = false;
+  }
+});
+bindSlider('aoIntensity', (v) => viewer.post.setAOIntensity(v), fixed2);
+bindSlider('aoRadius', (v) => viewer.post.setAORadius(v), fixed2);
+syncPostRows();
+
 // Capture
 bindSlider('shotScale', () => {}, (v) => `${v}×`);
 

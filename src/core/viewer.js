@@ -45,6 +45,7 @@ import { disposeObject } from './dispose.js';
 import { measure, normalizeObject, frameCamera } from './frame.js';
 import { createOrientation } from './orientation.js';
 import { createAnimation } from './animation.js';
+import { createPostProcessing } from './post.js';
 import {
   collectMaterials,
   setBaseColor,
@@ -103,6 +104,9 @@ export function createViewer({ container }) {
 
     renderer.setPixelRatio(ratio);
     renderer.setSize(width, height, false);
+    // The composer keeps its own render targets, which have to track the
+    // canvas or the image stretches.
+    post?.setSize(width, height);
 
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -150,6 +154,11 @@ export function createViewer({ container }) {
 
   // --- render loop ---------------------------------------------------------
 
+  // Owns the EffectComposer once any effect is switched on. Declared here
+  // because the render loop's callback references it and it needs the loop's
+  // invalidate — see the assignment immediately after createRenderLoop.
+  let post = null;
+
   let animation = null;
   let autoRotate = false;
   let autoRotateSpeed = 0.3; // radians/second
@@ -177,14 +186,27 @@ export function createViewer({ container }) {
       }
     },
     render() {
-      renderer.render(scene, camera);
+      // post is assigned just below; it needs the loop's invalidate, and the
+      // loop needs its render. With no effects enabled post.render() falls
+      // straight through to renderer.render(), so this is not an extra layer
+      // in the common case.
+      if (post) post.render();
+      else renderer.render(scene, camera);
     },
+  });
+
+  post = createPostProcessing({
+    renderer,
+    scene,
+    camera,
+    invalidate: (frames) => loop.invalidate(frames),
   });
 
   const environment = createEnvironment({
     scene,
     renderer,
     invalidate: () => loop.invalidate(),
+    getPost: () => post,
   });
 
   // Lit on the very first frame, before any HDR has been fetched.
@@ -291,6 +313,8 @@ export function createViewer({ container }) {
     currentBounds = { radius: m.sphere.radius, center: m.sphere.center, size: m.size };
     lights.fitTo(modelRoot, currentBounds);
     fitStage();
+    // AO radius is a fraction of the subject, not a fixed world distance.
+    post?.setSubject(currentBounds);
     return currentBounds;
   }
 
@@ -451,7 +475,10 @@ export function createViewer({ container }) {
       renderer.setPixelRatio(Math.min(previousRatio * scale, 8));
     }
 
-    renderer.render(scene, camera);
+    // Through the same path as the viewport, so a screenshot carries the same
+    // ambient occlusion and antialiasing the user is looking at.
+    if (post) post.render();
+    else renderer.render(scene, camera);
 
     // Copy out of the WebGL canvas immediately, before restoring anything.
     const out = document.createElement('canvas');
@@ -535,6 +562,11 @@ export function createViewer({ container }) {
     environment,
     loop,
     orientation,
+
+    /** Ambient occlusion and antialiasing. See core/post.js. */
+    get post() {
+      return post;
+    },
 
     get model() {
       return current;

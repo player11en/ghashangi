@@ -47,8 +47,11 @@ export const DEFAULT_HDR = 'Skybox/blouberg_sunrise_2_1k.hdr';
  * @param {import('three').Scene} options.scene
  * @param {import('three').WebGLRenderer} options.renderer
  * @param {() => void} options.invalidate  Ask the render loop for a redraw.
+ * @param {() => object|null} [options.getPost]  The post-processing module, if
+ *   one exists. An accessor rather than the object itself so this does not
+ *   depend on which of the two is constructed first.
  */
-export function createEnvironment({ scene, renderer, invalidate }) {
+export function createEnvironment({ scene, renderer, invalidate, getPost = () => null }) {
   const pmrem = new PMREMGenerator(renderer);
 
   // Resources we own and must dispose when replacing the environment. Kept
@@ -179,7 +182,16 @@ export function createEnvironment({ scene, renderer, invalidate }) {
     setToneMapping(name) {
       const mapping = TONE_MAPPINGS[name];
       if (mapping === undefined) return false;
-      renderer.toneMapping = mapping;
+
+      // Routed through the post-processing module rather than written straight
+      // onto the renderer. When an EffectComposer is in the output path,
+      // OutputPass performs tone mapping, and leaving it on the renderer as
+      // well applies the curve twice. post owns which of the two is live; this
+      // only records the choice.
+      const post = getPost();
+      if (post) post.setToneMapping(mapping);
+      else renderer.toneMapping = mapping;
+
       // Tone mapping is compiled into every material's shader.
       scene.traverse((node) => {
         const material = node.material;

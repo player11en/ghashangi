@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "dev:https": "vite --host --mode https",
+    "check": "node scripts/check-refs.mjs",
+    "prebuild": "npm run check",
     "build": "vite build",
     "preview": "vite preview",
     "preview:https": "vite preview --host --mode https",

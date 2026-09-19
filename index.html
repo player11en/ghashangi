@@ -286,6 +286,29 @@
           <input type="checkbox" id="bgToggle" checked>
           <label for="bgToggle">Show background</label>
         </div>
+
+        <!-- Contact darkening in seams and crevices is what makes a product
+             read as sitting on the backdrop rather than pasted onto it. It is
+             the main thing separating this from a real-time studio renderer.
+             Off by default: it costs a full extra pass per frame. -->
+        <div class="row row-check">
+          <input type="checkbox" id="aoToggle">
+          <label for="aoToggle">Ambient occlusion</label>
+        </div>
+        <div class="row" data-ao>
+          <label for="aoIntensity">AO strength</label>
+          <input type="range" id="aoIntensity" min="0" max="2" step="0.05" value="1">
+          <output for="aoIntensity" id="aoIntensityOut">1.00</output>
+        </div>
+        <div class="row" data-ao>
+          <label for="aoRadius">AO radius</label>
+          <input type="range" id="aoRadius" min="0.02" max="1" step="0.01" value="0.25">
+          <output for="aoRadius" id="aoRadiusOut">0.25</output>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="aaToggle">
+          <label for="aaToggle">Antialiasing (SMAA)</label>
+        </div>
       </section>
 
       <section class="group">
