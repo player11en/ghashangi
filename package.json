@@ -1,0 +1,25 @@
+{
+  "name": "3dmviewer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Browser 3D model viewer — load from disk, URL or a Google Drive link; inspect, light, screenshot and view in AR.",
+  "scripts": {
+    "decoders": "node scripts/copy-decoders.mjs",
+    "predev": "npm run decoders",
+    "dev": "vite",
+    "predev:https": "npm run decoders",
+    "dev:https": "vite --host --mode https",
+    "prebuild": "npm run decoders",
+    "build": "vite build",
+    "preview": "vite preview",
+    "preview:https": "vite preview --host --mode https"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "vite": "^7.1.5"
+  }
+}
