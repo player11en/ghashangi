@@ -9,6 +9,12 @@ import { createColorways, exportColorwayPNGs, exportGLB } from '../core/colorway
 
 const $ = (id) => document.getElementById(id);
 
+/** Normalise free-typed hex text to '#rrggbb', or null if it isn't valid hex. */
+function normalizeHex(text) {
+  const v = text.trim().replace(/^#/, '').toLowerCase();
+  return /^[0-9a-f]{6}$/.test(v) ? `#${v}` : null;
+}
+
 /** Channels with a plain numeric slider, and how to format the readout. */
 const NUMERIC = [
   { channel: 'metalness', id: 'matMetalness', format: (v) => v.toFixed(2) },
@@ -118,10 +124,10 @@ export function createMaterialsPanel({ viewer, toasts }) {
 
     if (state.targetColor) {
       $('matColor').value = state.targetColor;
-      $('matColorOut').textContent = state.targetColor;
+      $('matColorOut').value = state.targetColor;
     }
     $('matBlend').value = String(state.blend);
-    $('matBlendOut').textContent = `${Math.round(state.blend * 100)}%`;
+    $('matBlendOut').value = `${Math.round(state.blend * 100)}%`;
 
     // Blend only means something when there is a texture to blend against.
     // On an untextured material the colour is the colour.
@@ -132,14 +138,14 @@ export function createMaterialsPanel({ viewer, toasts }) {
       setRowVisible(id, has);
       if (!has) continue;
       $(id).value = String(state[channel]);
-      $(`${id}Out`).textContent = format(state[channel]);
+      $(`${id}Out`).value = format(state[channel]);
     }
 
     const hasEmissive = Boolean(entry.material.emissive);
     setRowVisible('matEmissive', hasEmissive);
     if (hasEmissive) {
       $('matEmissive').value = state.emissive;
-      $('matEmissiveOut').textContent = state.emissive;
+      $('matEmissiveOut').value = state.emissive;
     }
 
     syncing = false;
@@ -160,25 +166,76 @@ export function createMaterialsPanel({ viewer, toasts }) {
 
   // --- material controls ---------------------------------------------------
 
-  function applyColor() {
+  /**
+   * @param {string} color  '#rrggbb'
+   * @param {number} blend  0..1
+   */
+  function applyColor(color, blend) {
     if (syncing || !selectedKey) return;
-    const color = $('matColor').value;
-    const blend = parseFloat($('matBlend').value);
     viewer.setMaterialColor(selectedKey, color, blend);
-    $('matColorOut').textContent = color;
-    $('matBlendOut').textContent = `${Math.round(blend * 100)}%`;
+    $('matColor').value = color;
+    $('matColorOut').value = color;
+    $('matBlend').value = String(blend);
+    $('matBlendOut').value = `${Math.round(blend * 100)}%`;
     refreshSwatch();
   }
 
-  $('matColor').addEventListener('input', applyColor);
-  $('matBlend').addEventListener('input', applyColor);
+  const currentColor = () => $('matColor').value;
+  const currentBlend = () => parseFloat($('matBlend').value);
+
+  $('matColor').addEventListener('input', () => applyColor(currentColor(), currentBlend()));
+  $('matBlend').addEventListener('input', () => applyColor(currentColor(), currentBlend()));
+
+  // Typed hex entry. matColorOut was a read-only <output>; picking a colour
+  // from the native swatch is imprecise for matching a brand hex exactly, so
+  // it is now also a text field.
+  $('matColorOut').addEventListener('change', () => {
+    if (syncing || !selectedKey) return;
+    const hex = normalizeHex($('matColorOut').value);
+    if (hex) applyColor(hex, currentBlend());
+    else $('matColorOut').value = currentColor(); // reject silently, restore
+  });
+  $('matColorOut').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') event.target.blur();
+  });
+
+  // Typed blend entry. Displayed as a percentage but the underlying domain is
+  // 0..1 (see applyColor / setBaseColor), so the /100 conversion happens here,
+  // not in the shared numeric-field pattern the plain sliders below use.
+  $('matBlendOut').addEventListener('change', () => {
+    if (syncing || !selectedKey) return;
+    const parsed = parseFloat($('matBlendOut').value); // "75%" -> 75
+    const clamped = Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) / 100 : currentBlend();
+    applyColor(currentColor(), clamped);
+  });
+  $('matBlendOut').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') event.target.blur();
+  });
 
   for (const { channel, id, format } of NUMERIC) {
-    $(id).addEventListener('input', () => {
+    const slider = $(id);
+    const output = $(`${id}Out`);
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+
+    slider.addEventListener('input', () => {
       if (syncing || !selectedKey) return;
-      const value = parseFloat($(id).value);
+      const value = parseFloat(slider.value);
       viewer.setMaterialChannel(selectedKey, channel, value);
-      $(`${id}Out`).textContent = format(value);
+      output.value = format(value);
+    });
+
+    // Typed entry, clamped to the same range the slider allows.
+    output.addEventListener('change', () => {
+      if (syncing || !selectedKey) return;
+      const parsed = parseFloat(output.value);
+      const clamped = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : parseFloat(slider.value);
+      slider.value = String(clamped);
+      viewer.setMaterialChannel(selectedKey, channel, clamped);
+      output.value = format(clamped);
+    });
+    output.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') event.target.blur();
     });
   }
 
@@ -186,7 +243,21 @@ export function createMaterialsPanel({ viewer, toasts }) {
     if (syncing || !selectedKey) return;
     const color = $('matEmissive').value;
     viewer.setMaterialEmissive(selectedKey, color);
-    $('matEmissiveOut').textContent = color;
+    $('matEmissiveOut').value = color;
+  });
+
+  $('matEmissiveOut').addEventListener('change', () => {
+    if (syncing || !selectedKey) return;
+    const hex = normalizeHex($('matEmissiveOut').value);
+    if (hex) {
+      $('matEmissive').value = hex;
+      viewer.setMaterialEmissive(selectedKey, hex);
+    } else {
+      $('matEmissiveOut').value = $('matEmissive').value; // reject silently
+    }
+  });
+  $('matEmissiveOut').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') event.target.blur();
   });
 
   $('resetMaterial').addEventListener('click', () => {

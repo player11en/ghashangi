@@ -58,12 +58,12 @@
         <div class="row">
           <label for="scaleSlider">Scale</label>
           <input type="range" id="scaleSlider" min="0.1" max="3" step="0.05" value="1">
-          <output for="scaleSlider" id="scaleOut">1.00×</output>
+          <input type="text" inputmode="decimal" class="value-input" id="scaleOut" value="1.00×" aria-label="Scale value">
         </div>
         <div class="row">
           <label for="heightSlider">Height</label>
           <input type="range" id="heightSlider" min="-15" max="15" step="0.1" value="0">
-          <output for="heightSlider" id="heightOut">0.0</output>
+          <input type="text" inputmode="decimal" class="value-input" id="heightOut" value="0.0" aria-label="Height value">
         </div>
         <div class="row row-buttons">
           <button type="button" id="frameButton" class="button button-quiet">Frame</button>
@@ -102,21 +102,21 @@
           <button type="button" class="nudge" data-axis="x" data-delta="-90" aria-label="Rotate X minus 90 degrees">−90</button>
           <input type="range" id="rotX" min="-180" max="180" step="1" value="0">
           <button type="button" class="nudge" data-axis="x" data-delta="90" aria-label="Rotate X plus 90 degrees">+90</button>
-          <output for="rotX" id="rotXOut">0°</output>
+          <input type="text" inputmode="decimal" class="value-input" id="rotXOut" value="0°" aria-label="Rotate X value">
         </div>
         <div class="row row-axis">
           <label for="rotY">Rotate Y</label>
           <button type="button" class="nudge" data-axis="y" data-delta="-90" aria-label="Rotate Y minus 90 degrees">−90</button>
           <input type="range" id="rotY" min="-180" max="180" step="1" value="0">
           <button type="button" class="nudge" data-axis="y" data-delta="90" aria-label="Rotate Y plus 90 degrees">+90</button>
-          <output for="rotY" id="rotYOut">0°</output>
+          <input type="text" inputmode="decimal" class="value-input" id="rotYOut" value="0°" aria-label="Rotate Y value">
         </div>
         <div class="row row-axis">
           <label for="rotZ">Rotate Z</label>
           <button type="button" class="nudge" data-axis="z" data-delta="-90" aria-label="Rotate Z minus 90 degrees">−90</button>
           <input type="range" id="rotZ" min="-180" max="180" step="1" value="0">
           <button type="button" class="nudge" data-axis="z" data-delta="90" aria-label="Rotate Z plus 90 degrees">+90</button>
-          <output for="rotZ" id="rotZOut">0°</output>
+          <input type="text" inputmode="decimal" class="value-input" id="rotZOut" value="0°" aria-label="Rotate Z value">
         </div>
 
         <button type="button" id="resetOrientation" class="button button-quiet">Reset orientation</button>
@@ -154,7 +154,7 @@
           <div class="row">
             <label for="matColor">Base colour</label>
             <input type="color" id="matColor" value="#ffffff">
-            <output for="matColor" id="matColorOut">#ffffff</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matColorOut" value="#ffffff" aria-label="Base colour hex value">
           </div>
           <!-- Colour multiplies the base texture rather than replacing it, so
                this dial slides from the authored look to a full tint without
@@ -162,32 +162,32 @@
           <div class="row">
             <label for="matBlend">Blend</label>
             <input type="range" id="matBlend" min="0" max="1" step="0.01" value="1">
-            <output for="matBlend" id="matBlendOut">100%</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matBlendOut" value="100%" aria-label="Blend value">
           </div>
           <div class="row" data-channel="metalness">
             <label for="matMetalness">Metalness</label>
             <input type="range" id="matMetalness" min="0" max="1" step="0.01" value="0">
-            <output for="matMetalness" id="matMetalnessOut">0.00</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matMetalnessOut" value="0.00" aria-label="Metalness value">
           </div>
           <div class="row" data-channel="roughness">
             <label for="matRoughness">Roughness</label>
             <input type="range" id="matRoughness" min="0" max="1" step="0.01" value="1">
-            <output for="matRoughness" id="matRoughnessOut">1.00</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matRoughnessOut" value="1.00" aria-label="Roughness value">
           </div>
           <div class="row" data-channel="emissive">
             <label for="matEmissive">Emissive</label>
             <input type="color" id="matEmissive" value="#000000">
-            <output for="matEmissive" id="matEmissiveOut">#000000</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matEmissiveOut" value="#000000" aria-label="Emissive colour hex value">
           </div>
           <div class="row" data-channel="emissiveIntensity">
             <label for="matEmissiveIntensity">Glow</label>
             <input type="range" id="matEmissiveIntensity" min="0" max="5" step="0.05" value="1">
-            <output for="matEmissiveIntensity" id="matEmissiveIntensityOut">1.00</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matEmissiveIntensityOut" value="1.00" aria-label="Glow value">
           </div>
           <div class="row" data-channel="opacity">
             <label for="matOpacity">Opacity</label>
             <input type="range" id="matOpacity" min="0" max="1" step="0.01" value="1">
-            <output for="matOpacity" id="matOpacityOut">1.00</output>
+            <input type="text" inputmode="decimal" class="value-input" id="matOpacityOut" value="1.00" aria-label="Opacity value">
           </div>
 
           <div class="row row-buttons">
@@ -225,27 +225,27 @@
         <div class="row">
           <label for="ambientSlider">Ambient</label>
           <input type="range" id="ambientSlider" min="0" max="3" step="0.05" value="0.3">
-          <output for="ambientSlider" id="ambientOut">0.30</output>
+          <input type="text" inputmode="decimal" class="value-input" id="ambientOut" value="0.30" aria-label="Ambient light value">
         </div>
         <div class="row">
           <label for="sunSlider">Sun</label>
           <input type="range" id="sunSlider" min="0" max="5" step="0.05" value="1.8">
-          <output for="sunSlider" id="sunOut">1.80</output>
+          <input type="text" inputmode="decimal" class="value-input" id="sunOut" value="1.80" aria-label="Sun light value">
         </div>
         <div class="row">
           <label for="leftSlider">Left fill</label>
           <input type="range" id="leftSlider" min="0" max="30" step="0.1" value="4.5">
-          <output for="leftSlider" id="leftOut">4.5</output>
+          <input type="text" inputmode="decimal" class="value-input" id="leftOut" value="4.5" aria-label="Left fill light value">
         </div>
         <div class="row">
           <label for="rightSlider">Right fill</label>
           <input type="range" id="rightSlider" min="0" max="30" step="0.1" value="2.1">
-          <output for="rightSlider" id="rightOut">2.1</output>
+          <input type="text" inputmode="decimal" class="value-input" id="rightOut" value="2.1" aria-label="Right fill light value">
         </div>
         <div class="row">
           <label for="angleSlider">Sun angle</label>
           <input type="range" id="angleSlider" min="-90" max="270" step="1" value="53">
-          <output for="angleSlider" id="angleOut">53°</output>
+          <input type="text" inputmode="decimal" class="value-input" id="angleOut" value="53°" aria-label="Sun angle value">
         </div>
         <div class="row row-check">
           <input type="checkbox" id="shadowToggle" checked>
@@ -258,17 +258,17 @@
         <div class="row">
           <label for="exposureSlider">Exposure</label>
           <input type="range" id="exposureSlider" min="0" max="3" step="0.05" value="0.6">
-          <output for="exposureSlider" id="exposureOut">0.60</output>
+          <input type="text" inputmode="decimal" class="value-input" id="exposureOut" value="0.60" aria-label="Exposure value">
         </div>
         <div class="row">
           <label for="envIntensity">Env intensity</label>
           <input type="range" id="envIntensity" min="0" max="3" step="0.05" value="1">
-          <output for="envIntensity" id="envIntensityOut">1.00</output>
+          <input type="text" inputmode="decimal" class="value-input" id="envIntensityOut" value="1.00" aria-label="Environment intensity value">
         </div>
         <div class="row">
           <label for="envRotation">Env rotation</label>
           <input type="range" id="envRotation" min="0" max="360" step="1" value="0">
-          <output for="envRotation" id="envRotationOut">0°</output>
+          <input type="text" inputmode="decimal" class="value-input" id="envRotationOut" value="0°" aria-label="Environment rotation value">
         </div>
         <div class="row">
           <label for="toneMapping">Tone mapping</label>
@@ -298,12 +298,12 @@
         <div class="row" data-ao>
           <label for="aoIntensity">AO strength</label>
           <input type="range" id="aoIntensity" min="0" max="2" step="0.05" value="1">
-          <output for="aoIntensity" id="aoIntensityOut">1.00</output>
+          <input type="text" inputmode="decimal" class="value-input" id="aoIntensityOut" value="1.00" aria-label="AO strength value">
         </div>
         <div class="row" data-ao>
           <label for="aoRadius">AO radius</label>
           <input type="range" id="aoRadius" min="0.02" max="1" step="0.01" value="0.25">
-          <output for="aoRadius" id="aoRadiusOut">0.25</output>
+          <input type="text" inputmode="decimal" class="value-input" id="aoRadiusOut" value="0.25" aria-label="AO radius value">
         </div>
         <div class="row row-check">
           <input type="checkbox" id="aaToggle">

@@ -162,12 +162,36 @@ body {
   color: var(--text-dim);
 }
 
-.row output {
+.row output,
+.row .value-input {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-dim);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Editable value fields next to a slider or colour picker (Track 1.1) — look
+   like the plain read-only output they replaced until focused, so the panel
+   doesn't visually change, but every value can be typed as well as dragged. */
+.row .value-input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: text;
+}
+.row .value-input:hover {
+  color: var(--text);
+  background: var(--surface-raised);
+}
+.row .value-input:focus {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--accent);
+  outline: none;
 }
 
 .row-buttons {

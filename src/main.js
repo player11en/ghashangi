@@ -309,7 +309,17 @@ urlForm.addEventListener('submit', (event) => {
 // --- control wiring ------------------------------------------------------
 
 /**
- * Bind a range input to a setter, keeping its <output> in sync.
+ * Bind a range input to a setter, keeping a paired value field in sync in both
+ * directions.
+ *
+ * The paired field (`#{id}Out` / `#{id-without-Slider}Out`) used to be a
+ * read-only `<output>`; it is now an `<input type="text">` styled to look the
+ * same, so the exact value can be typed instead of only dragged — useful for
+ * "rotate exactly 37°" or "scale exactly 1.375×" in a way a slider can't do.
+ *
+ * `parseFloat` on the typed value ignores a trailing unit character, so the
+ * same formatted string the slider produces (`"53°"`, `"1.00×"`) can be typed
+ * straight back in unedited — no separate unit-stripping needed.
  *
  * @param {string} id
  * @param {(value:number) => void} apply
@@ -318,13 +328,33 @@ urlForm.addEventListener('submit', (event) => {
 function bindSlider(id, apply, format) {
   const input = $(id);
   const output = $(`${id.replace('Slider', '')}Out`) ?? $(`${id}Out`);
-  const sync = () => {
-    const value = parseFloat(input.value);
+  const min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+  const max = input.max !== '' ? parseFloat(input.max) : Infinity;
+
+  const sync = (value) => {
     apply(value);
-    if (output) output.textContent = format(value);
+    input.value = String(value);
+    if (output) output.value = format(value);
   };
-  input.addEventListener('input', sync);
-  sync();
+
+  input.addEventListener('input', () => sync(parseFloat(input.value)));
+
+  if (output) {
+    const commit = () => {
+      const parsed = parseFloat(output.value);
+      const clamped = Number.isFinite(parsed)
+        ? Math.min(max, Math.max(min, parsed))
+        : parseFloat(input.value); // invalid entry: fall back to the last good value
+      sync(clamped);
+    };
+    output.addEventListener('change', commit);
+    // Enter commits immediately rather than waiting for blur.
+    output.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') output.blur();
+    });
+  }
+
+  sync(parseFloat(input.value));
 }
 
 function bindCheckbox(id, apply) {
@@ -359,7 +389,7 @@ function syncOrientationUI() {
     const slider = $(`rot${axis.toUpperCase()}`);
     const output = $(`rot${axis.toUpperCase()}Out`);
     slider.value = String(Math.round(angles[axis]));
-    output.textContent = `${Math.round(angles[axis])}°`;
+    output.value = `${Math.round(angles[axis])}°`;
   }
 
   for (const button of document.querySelectorAll('.seg[data-up]')) {
@@ -368,9 +398,27 @@ function syncOrientationUI() {
 }
 
 for (const axis of AXES) {
-  $(`rot${axis.toUpperCase()}`).addEventListener('input', (event) => {
+  const slider = $(`rot${axis.toUpperCase()}`);
+  const output = $(`rot${axis.toUpperCase()}Out`);
+
+  slider.addEventListener('input', (event) => {
     viewer.orientation.setAxis(axis, parseFloat(event.target.value));
     syncOrientationUI();
+  });
+
+  // Typed entry: rotXOut etc. were read-only <output>s, now editable so an
+  // exact angle can be entered rather than dragged to the nearest degree.
+  const commitTypedAngle = () => {
+    const parsed = parseFloat(output.value); // ignores the trailing "°"
+    const clamped = Number.isFinite(parsed)
+      ? Math.min(180, Math.max(-180, parsed))
+      : viewer.orientation.angles[axis];
+    viewer.orientation.setAxis(axis, clamped);
+    syncOrientationUI();
+  };
+  output.addEventListener('change', commitTypedAngle);
+  output.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') output.blur();
   });
 }
 
