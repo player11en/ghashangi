@@ -219,7 +219,6 @@ export function createViewer({ container }) {
     scene,
     renderer,
     invalidate: () => loop.invalidate(),
-    getPost: () => post,
   });
 
   // Lit on the very first frame, before any HDR has been fetched.
@@ -508,10 +507,22 @@ export function createViewer({ container }) {
     const height = container.clientHeight;
 
     const previousBackground = scene.background;
+    const previousStageVisible = stageRoot.visible;
     const previousRatio = renderer.getPixelRatio();
     const clampedScale = Math.min(scale, maxScreenshotScale());
 
-    if (transparent) scene.background = null;
+    if (transparent) {
+      scene.background = null;
+      // scene.background alone only clears the sky — Stage.glb is an opaque
+      // cyclorama that fills essentially the whole frame behind the subject,
+      // so with it visible (the default) a "transparent" capture measured 0%
+      // transparent pixels: correct clearing of a background nothing was
+      // covering. The shadow catcher is deliberately left alone — its
+      // ShadowMaterial is already semi-transparent, so it contributes a soft
+      // contact shadow into the alpha channel, which is the wanted look for a
+      // product cutout, not a bug to route around.
+      stageRoot.visible = false;
+    }
     if (clampedScale !== 1) {
       renderer.setPixelRatio(previousRatio * clampedScale);
     }
@@ -527,7 +538,10 @@ export function createViewer({ container }) {
     out.height = renderer.domElement.height;
     out.getContext('2d').drawImage(renderer.domElement, 0, 0);
 
-    if (transparent) scene.background = previousBackground;
+    if (transparent) {
+      scene.background = previousBackground;
+      stageRoot.visible = previousStageVisible;
+    }
     if (clampedScale !== 1) renderer.setPixelRatio(previousRatio);
     renderer.setSize(width, height, false);
     loop.invalidate();

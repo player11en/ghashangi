@@ -47,11 +47,8 @@ export const DEFAULT_HDR = 'Skybox/blouberg_sunrise_2_1k.hdr';
  * @param {import('three').Scene} options.scene
  * @param {import('three').WebGLRenderer} options.renderer
  * @param {() => void} options.invalidate  Ask the render loop for a redraw.
- * @param {() => object|null} [options.getPost]  The post-processing module, if
- *   one exists. An accessor rather than the object itself so this does not
- *   depend on which of the two is constructed first.
  */
-export function createEnvironment({ scene, renderer, invalidate, getPost = () => null }) {
+export function createEnvironment({ scene, renderer, invalidate }) {
   const pmrem = new PMREMGenerator(renderer);
 
   // Resources we own and must dispose when replacing the environment. Kept
@@ -183,14 +180,15 @@ export function createEnvironment({ scene, renderer, invalidate, getPost = () =>
       const mapping = TONE_MAPPINGS[name];
       if (mapping === undefined) return false;
 
-      // Routed through the post-processing module rather than written straight
-      // onto the renderer. When an EffectComposer is in the output path,
-      // OutputPass performs tone mapping, and leaving it on the renderer as
-      // well applies the curve twice. post owns which of the two is live; this
-      // only records the choice.
-      const post = getPost();
-      if (post) post.setToneMapping(mapping);
-      else renderer.toneMapping = mapping;
+      // A plain, direct write, even with post-processing active. Three only
+      // applies renderer.toneMapping to a material rendered straight to the
+      // canvas (WebGLPrograms.js's getParameters(): NoToneMapping is forced
+      // for anything rendered to an off-screen target). RenderPass renders the
+      // scene into EffectComposer's off-screen buffers, so it structurally
+      // cannot double up with OutputPass, which is the pass that writes to the
+      // real canvas and separately, explicitly reads this same property to
+      // choose its own curve. See post.js's file header for the full case.
+      renderer.toneMapping = mapping;
 
       // Tone mapping is compiled into every material's shader.
       scene.traverse((node) => {

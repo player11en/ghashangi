@@ -25,12 +25,35 @@
 //   * The composer and its passes are only built on first use, so a visit that
 //     never enables AO never pays for the passes or their render targets.
 //
-//   * OutputPass takes over tone mapping and the colour-space conversion. The
-//     renderer's own toneMapping has to be neutralised while the composer is
-//     driving, or the image is tone-mapped twice — once into the composer's
-//     buffer and again on the way out. See setEnabled().
+// ---------------------------------------------------------------------------
+// Tone mapping: no special handling needed, and here is the proof
+//
+// The first version of this module assumed rendering the scene into
+// EffectComposer's off-screen buffers (via RenderPass) would double up with
+// OutputPass's own tone mapping, and "fixed" it by forcing
+// renderer.toneMapping to NoToneMapping for the whole composer.render() call.
+// That shipped broken — caught on test/render.mjs's first real run ("tone
+// mapping still changes the image with AO on" failed outright), because it
+// also blinded OutputPass, which reads that same property.
+//
+// The actual mechanism, found in three's own source
+// (src/renderers/webgl/WebGLPrograms.js, getParameters()):
+//
+//   toneMapping = material.toneMapped && currentRenderTarget === null
+//     ? renderer.toneMapping : NoToneMapping;
+//
+// A standard material only gets tone-mapped when it is rendered straight to
+// the canvas (`currentRenderTarget === null`). RenderPass renders the scene
+// into an off-screen WebGLRenderTarget — so every material in the scene is
+// structurally guaranteed NoToneMapping there, regardless of what
+// renderer.toneMapping is set to, with no help from this module needed.
+// OutputPass is the one pass that writes to the real canvas, and separately,
+// explicitly reads renderer.toneMapping itself to choose its curve. The two
+// can never fight: leave renderer.toneMapping at whatever environment.js set,
+// unmodified, for the whole call, and each pass does the right thing on its
+// own by construction.
 
-import { NoToneMapping, Vector2 } from 'three';
+import { Vector2 } from 'three';
 
 /** Passes are imported on first enable, not at module load. */
 let modules = null;
@@ -70,10 +93,6 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let aoRadiusFactor = 0.25;
   let subjectRadius = 5;
 
-  // Remembered so the passthrough can restore it when the composer is off.
-  const rendererToneMapping = () => renderer.toneMapping;
-  let savedToneMapping = renderer.toneMapping;
-
   // renderer.getSize() calls target.set(), so it needs a real Vector2 — a plain
   // {x, y} throws.
   const _size = new Vector2();
@@ -104,7 +123,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     composer.addPass(smaaPass);
 
     // Must be last: it performs tone mapping and the sRGB conversion that the
-    // renderer would otherwise do on its own.
+    // renderer would otherwise do on its own. Reads renderer.toneMapping
+    // itself, unmodified by anything above it — see the file header.
     composer.addPass(new OutputPass());
 
     applyAO();
@@ -126,38 +146,10 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     });
   }
 
-  /**
-   * Hand tone mapping to OutputPass while the composer runs, and give it back
-   * when it stops. Applying it in both places double-darkens the image.
-   */
-  function syncToneMapping() {
-    if (active()) {
-      if (renderer.toneMapping !== NoToneMapping) savedToneMapping = rendererToneMapping();
-      renderer.toneMapping = NoToneMapping;
-    } else {
-      renderer.toneMapping = savedToneMapping;
-    }
-  }
-
   return {
     /** Whether the composer is currently in the output path. */
     get active() {
       return active();
-    },
-
-    /** The tone mapping OutputPass should apply, for environment.js to set. */
-    get deferredToneMapping() {
-      return savedToneMapping;
-    },
-
-    /**
-     * environment.js calls this instead of writing renderer.toneMapping
-     * directly, so the value survives being handed back and forth.
-     */
-    setToneMapping(value) {
-      savedToneMapping = value;
-      syncToneMapping();
-      invalidate();
     },
 
     async setAO(enabled) {
@@ -167,7 +159,6 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
         await build(size.x, size.y);
       }
       applyAO();
-      syncToneMapping();
       invalidate(2);
     },
 
@@ -178,7 +169,6 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
         await build(size.x, size.y);
       }
       if (smaaPass) smaaPass.enabled = enabled;
-      syncToneMapping();
       invalidate(2);
     },
 
@@ -212,7 +202,12 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       gtaoPass?.setSize(width, height);
     },
 
-    /** The render call handed to the loop and to captureScreenshot(). */
+    /**
+     * The render call handed to the loop and to captureScreenshot().
+     *
+     * Deliberately does not touch renderer.toneMapping — see the file header
+     * for why nothing here needs to.
+     */
     render() {
       if (active() && composer) composer.render();
       else renderer.render(scene, camera);
@@ -225,7 +220,6 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer = null;
       gtaoPass = null;
       smaaPass = null;
-      renderer.toneMapping = savedToneMapping;
     },
   };
 }

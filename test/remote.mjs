@@ -112,7 +112,11 @@ for (const testCase of CASES) {
       textures: v.renderer.info.memory.textures,
       geometriesBefore: before.geometries,
       geometriesAfter: v.renderer.info.memory.geometries,
-      animated: v.mixer != null,
+      // v.mixer was replaced by v.animation (a full playback controller) when
+      // Track A added clip selection/scrub/speed — this test predates that
+      // and was missed at the time; test/animation.mjs got the equivalent
+      // update and already covers the controller thoroughly.
+      animated: v.animation != null,
       radius: v.bounds?.radius ?? 0,
       cameraDistance: v.camera.position.distanceTo(v.controls.target),
       // The whole point of normalisation: wildly different source scales all
@@ -140,7 +144,7 @@ for (const testCase of CASES) {
   check(
     '  animation detected',
     result.animated === testCase.expect.animated,
-    result.animated ? 'mixer running' : 'static',
+    result.animated ? 'controller created' : 'static',
   );
 
   check(

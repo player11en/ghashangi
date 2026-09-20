@@ -46,6 +46,24 @@ deliberately idle render loop has no reason to produce. It manifests as a
 which is exactly the guarantee needed, and has the side benefit that these
 assertions exercise the same code path the Screenshot button uses.
 
+## Why the turntable test doesn't assert on video content
+
+`canvas.captureStream()` + `MediaRecorder` produce no real frame data under
+headless Chromium + SwiftShader software rendering — confirmed with a
+standalone repro (captureStream + MediaRecorder, zero app code involved) that
+delivered exactly one empty `dataavailable` event over a window that should
+have produced several, unaffected by `--headless=new` or autoplay-policy
+flags. This is the same class of headless-testing limitation as the
+screenshot one above, just for video instead of a single frame.
+
+`test/render.mjs` still hard-checks what doesn't depend on the browser's media
+pipeline cooperating — the render-loop hold during recording, and the model's
+rotation and the hold both being restored afterward — and reports whether real
+frame data came through as a diagnostic line rather than a pass/fail gate, so
+a genuine regression is still visible without failing the suite on something
+this environment cannot exercise. Verify actual video output (a real,
+seamlessly-looping WebM) manually in a real browser.
+
 ## Why pixel comparisons
 
 Several checks assert that moving a control *changes the rendered image* rather
