@@ -183,7 +183,25 @@ export async function exportColorwayPNGs({
 
   // PNG is already deflated; asking fflate to compress it again costs time and
   // saves nothing.
-  return new Blob([zipSync(files, { level: 0 })], { type: 'application/zip' });
+  //
+  // zipSync runs synchronously on the main thread. Measured rather than moved
+  // to a worker pre-emptively: at typical sizes (a handful of already-
+  // compressed PNGs, level 0 = store not deflate) this finishes well under a
+  // frame budget. It could become real at high `scale` x many colourways —
+  // logged here so that's a measurement, not a guess, if it's ever raised
+  // again. ~150ms is the rule-of-thumb threshold above which a synchronous
+  // main-thread task starts being felt as jank.
+  const zipStarted = performance.now();
+  const zip = zipSync(files, { level: 0 });
+  const zipMs = performance.now() - zipStarted;
+  if (zipMs > 150) {
+    console.warn(
+      `[3DMViewer] colourway zip took ${zipMs.toFixed(0)}ms for ${colorways.length} image(s) ` +
+        `— consider moving zipSync to a worker if this recurs.`,
+    );
+  }
+
+  return new Blob([zip], { type: 'application/zip' });
 }
 
 /**
