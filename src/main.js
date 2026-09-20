@@ -554,8 +554,21 @@ bindSlider('shotScale', () => {}, (v) => `${v}×`);
 
 $('screenshotButton').addEventListener('click', async () => {
   try {
+    const requestedScale = parseInt($('shotScale').value, 10);
+    const maxScale = viewer.maxScreenshotScale();
+
+    // Warned here rather than only relying on captureScreenshot()'s internal
+    // clamp, so a smaller-than-requested image comes with an explanation
+    // instead of looking like a bug.
+    if (requestedScale > maxScale) {
+      toasts.warn(
+        `${requestedScale}× exceeds this device's limit`,
+        `Using ${maxScale.toFixed(1)}× instead.`,
+      );
+    }
+
     const blob = await viewer.captureScreenshot({
-      scale: parseInt($('shotScale').value, 10),
+      scale: requestedScale,
       transparent: $('shotTransparent').checked,
     });
 

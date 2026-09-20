@@ -361,6 +361,18 @@ export function createMaterialsPanel({ viewer, toasts }) {
       return;
     }
 
+    // Warn up front rather than silently clamping — viewer.captureScreenshot()
+    // clamps to the device's real texture-size limit internally as a safety
+    // floor either way, but a batch of colourways rendered one scale lower
+    // than asked for, with no explanation, would look like a bug.
+    const maxScale = viewer.maxScreenshotScale();
+    if (scale > maxScale) {
+      toasts.warn(
+        `${scale}× exceeds this device's limit`,
+        `Using ${maxScale.toFixed(1)}× instead for all ${set.length} image(s).`,
+      );
+    }
+
     const button = $('exportPngs');
     button.disabled = true;
     const label = button.textContent;

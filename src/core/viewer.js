@@ -466,12 +466,39 @@ export function createViewer({ container }) {
   // --- screenshots ---------------------------------------------------------
 
   /**
+   * The largest `scale` captureScreenshot() can actually honour on this
+   * device, before either dimension of the requested render target would
+   * exceed what the GPU can allocate.
+   *
+   * `renderer.capabilities.maxTextureSize` is a real number three already
+   * queried from WebGL at startup (GL_MAX_TEXTURE_SIZE), not a guess — this
+   * replaces what used to be a flat `Math.min(ratio, 8)`, which had no
+   * relationship to the device it was running on: too generous on a phone GPU
+   * with a 4096 limit, needlessly stingy on a desktop GPU that could do 16384.
+   *
+   * @returns {number}
+   */
+  function maxScreenshotScale() {
+    const maxTextureSize = renderer.capabilities.maxTextureSize;
+    const ratio = renderer.getPixelRatio();
+    const width = container.clientWidth || 1;
+    const height = container.clientHeight || 1;
+    return Math.max(1, Math.min(maxTextureSize / (width * ratio), maxTextureSize / (height * ratio)));
+  }
+
+  /**
    * Capture the current view.
    *
    * Renders and copies in one synchronous task, which is what makes this work
    * without preserveDrawingBuffer: the drawing buffer is still intact until the
    * task yields. The original relied on the same trick but raced against its own
    * second render loop.
+   *
+   * `scale` is silently clamped to `maxScreenshotScale()` if it would exceed
+   * the device's real texture-size limit — silent here because this is the
+   * defensive floor, not the user-facing decision; a caller that wants to warn
+   * before hitting this should check `maxScreenshotScale()` itself first (see
+   * the Screenshot button and colourway export in main.js).
    *
    * @param {{scale?: number, transparent?: boolean}} [options]
    * @returns {Promise<Blob>}
@@ -482,10 +509,11 @@ export function createViewer({ container }) {
 
     const previousBackground = scene.background;
     const previousRatio = renderer.getPixelRatio();
+    const clampedScale = Math.min(scale, maxScreenshotScale());
 
     if (transparent) scene.background = null;
-    if (scale !== 1) {
-      renderer.setPixelRatio(Math.min(previousRatio * scale, 8));
+    if (clampedScale !== 1) {
+      renderer.setPixelRatio(previousRatio * clampedScale);
     }
 
     // Through the same path as the viewport, so a screenshot carries the same
@@ -500,7 +528,7 @@ export function createViewer({ container }) {
     out.getContext('2d').drawImage(renderer.domElement, 0, 0);
 
     if (transparent) scene.background = previousBackground;
-    if (scale !== 1) renderer.setPixelRatio(previousRatio);
+    if (clampedScale !== 1) renderer.setPixelRatio(previousRatio);
     renderer.setSize(width, height, false);
     loop.invalidate();
 
@@ -691,6 +719,7 @@ export function createViewer({ container }) {
     clearModel,
     setStage,
     captureScreenshot,
+    maxScreenshotScale,
     setSideMode,
     setWireframe,
     setShadowsEnabled,
