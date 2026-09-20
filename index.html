@@ -399,7 +399,21 @@
           <dt>Materials</dt><dd id="statMaterials">—</dd>
           <dt>Draw calls</dt><dd id="statCalls">—</dd>
           <dt>Textures</dt><dd id="statTextures">—</dd>
+          <dt>Simplified</dt><dd id="statSimplify">—</dd>
         </dl>
+        <div class="row row-check">
+          <input type="checkbox" id="simplifyToggle" checked>
+          <label for="simplifyToggle" title="Takes effect on the next model loaded">Simplify dense models</label>
+        </div>
+        <div class="row">
+          <label for="simplifyBudget">Triangle budget</label>
+          <input type="range" id="simplifyBudget" min="50000" max="2000000" step="10000" value="500000">
+          <input type="text" inputmode="numeric" class="value-input" id="simplifyBudgetOut" value="500000" aria-label="Triangle budget value">
+        </div>
+        <p class="hint" id="simplifyHint">
+          Automatically reduces triangle count above the budget when a model
+          loads. Off, or a higher budget, applies from the next load onward.
+        </p>
         </div>
       </section>
     </div>

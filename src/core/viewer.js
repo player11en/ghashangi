@@ -47,6 +47,7 @@ import { createOrientation } from './orientation.js';
 import { createAnimation } from './animation.js';
 import { createPostProcessing } from './post.js';
 import { detectCapabilityTier } from './capability.js';
+import { simplifyToTriangleBudget, DEFAULT_TRIANGLE_BUDGET } from './simplify.js';
 import {
   collectMaterials,
   setBaseColor,
@@ -259,6 +260,15 @@ export function createViewer({ container }) {
   let materialCache = null;
   let statsCache = null;
 
+  // Dense-model triangle budget (Track 1.5.3). Enabled by default - a model
+  // already under budget is left completely untouched by simplifyToTriangleBudget,
+  // so this only ever does anything for the genuinely dense case it exists for.
+  let simplificationEnabled = true;
+  let simplificationBudget = DEFAULT_TRIANGLE_BUDGET;
+  // Populated on every load; read by the stats HUD for the "original vs
+  // simplified" readout. null before the first model finishes loading.
+  let simplificationResult = null;
+
   /**
    * Count what the model actually contains.
    *
@@ -360,9 +370,9 @@ export function createViewer({ container }) {
    * @param {object} [options]
    * @param {Array<import('three').AnimationClip>} [options.animations]
    * @param {boolean} [options.frame=true]  Reframe the camera onto it.
-   * @returns {{bounds: object, normalized: object, clips: Array}}
+   * @returns {Promise<{bounds: object, normalized: object, clips: Array}>}
    */
-  function setModel(object, { animations = [], frame = true } = {}) {
+  async function setModel(object, { animations = [], frame = true } = {}) {
     clearModel();
 
     const normalized = normalizeObject(object);
@@ -372,6 +382,13 @@ export function createViewer({ container }) {
       node.castShadow = true;
       node.receiveShadow = true;
     });
+
+    // Before the object joins the scene graph: nothing has rendered it yet,
+    // so replacing geometry here can't produce a visible pop from full detail
+    // down to simplified. A model already under budget comes back untouched.
+    simplificationResult = simplificationEnabled
+      ? await simplifyToTriangleBudget(object, simplificationBudget)
+      : null;
 
     modelRoot.rotation.set(0, 0, 0);
     // Orientation belongs to the file, not the session: a new model starts in
@@ -685,6 +702,24 @@ export function createViewer({ container }) {
     get modelStats() {
       if (!statsCache) statsCache = computeModelStats();
       return statsCache;
+    },
+
+    /**
+     * Result of the current model's load-time simplification pass, or null
+     * before any model has loaded: `{ original, simplified, applied }`
+     * triangle counts, `applied` false when the model was already under
+     * budget (the common case) or simplification is turned off.
+     */
+    get simplification() {
+      return simplificationResult;
+    },
+    /** Takes effect on the next model loaded, not retroactively - the
+     * pre-simplification geometry of the current model is already disposed. */
+    setSimplificationEnabled(enabled) {
+      simplificationEnabled = enabled;
+    },
+    setSimplificationBudget(triangles) {
+      simplificationBudget = triangles;
     },
 
     /** Look one up by the stable key from materialKey(). */

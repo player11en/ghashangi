@@ -41,6 +41,8 @@ const FIELDS = [
   { id: 'aoIntensity', kind: 'range' },
   { id: 'aoRadius', kind: 'range' },
   { id: 'qualityTier', kind: 'select' },
+  { id: 'simplifyToggle', kind: 'checkbox' },
+  { id: 'simplifyBudget', kind: 'range' },
 ];
 
 function readField({ id, kind }) {

@@ -101,7 +101,7 @@ async function loadFromFiles(files) {
       onProgress: (fraction) => progress.update(fraction),
     });
 
-    install(object, animations, fs, primary.name);
+    await install(object, animations, fs, primary.name);
 
     const extra = files.length > 1 ? ` (+${files.length - 1} linked files)` : '';
     toasts.info(`Loaded ${primary.name}${extra}`);
@@ -114,8 +114,8 @@ async function loadFromFiles(files) {
 }
 
 /** Swap in a freshly loaded object and retire the previous one's resources. */
-function install(object, animations, fs, name = 'model') {
-  viewer.setModel(object, { animations });
+async function install(object, animations, fs, name = 'model') {
+  await viewer.setModel(object, { animations });
   currentFs?.dispose();
   currentFs = fs ?? null;
   currentModelName = name;
@@ -166,7 +166,7 @@ async function loadBundled(url, label) {
       renderer: viewer.renderer,
       onProgress: (fraction) => progress.update(fraction),
     });
-    install(object, animations, null, url.split('/').pop());
+    await install(object, animations, null, url.split('/').pop());
     return object;
   } catch (error) {
     reportLoadFailure(error, label, extension);
@@ -290,7 +290,7 @@ async function loadFromLink(input) {
       onProgress: (fraction) => progress.update(fraction, `Parsing ${name}`),
     });
 
-    install(object, animations, null, name);
+    await install(object, animations, null, name);
     // The loader has the geometry now; the blob behind the URL can go.
     revokeObjectUrl(objectUrl);
     objectUrl = null;
@@ -388,6 +388,12 @@ bindCheckbox('stageToggle', (on) => viewer.setStageVisible(on));
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
+
+// Dense-model triangle budget (Stats group). Takes effect on the next model
+// loaded, not retroactively - the pre-simplification geometry of whatever is
+// on screen right now has already been disposed.
+bindCheckbox('simplifyToggle', (on) => viewer.setSimplificationEnabled(on));
+bindSlider('simplifyBudget', (v) => viewer.setSimplificationBudget(v), (v) => String(Math.round(v)));
 
 // Orientation
 //
@@ -634,6 +640,13 @@ function refreshStats() {
   // Draw calls genuinely are a per-frame property, so renderer.info is right here.
   $('statCalls').textContent = String(render.calls);
   $('statTextures').textContent = String(memory.textures);
+
+  const simplification = viewer.simplification;
+  $('statSimplify').textContent = !simplification
+    ? '—'
+    : simplification.applied
+      ? `${simplification.original.toLocaleString()} → ${simplification.simplified.toLocaleString()}`
+      : 'under budget';
 }
 
 // FPS is the only stat that needs polling; the rest change on load. 2Hz is
