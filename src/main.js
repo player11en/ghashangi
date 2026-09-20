@@ -508,6 +508,22 @@ bindSlider('aoIntensity', (v) => viewer.post.setAOIntensity(v), fixed2);
 bindSlider('aoRadius', (v) => viewer.post.setAORadius(v), fixed2);
 syncPostRows();
 
+// Quality tier: resolution scale and shadow map size always; AO/AA are only
+// ever forced *off* on 'low' (see viewer.js's applyQualityTier doc comment) -
+// bypassing the checkboxes' own click handlers, which would replay a network
+// fetch for passes that may already be loaded, so the checkbox/row UI is
+// synced here directly instead.
+function applyQualityTier(tier) {
+  viewer.applyQualityTier(tier);
+  if (tier === 'low') {
+    $('aoToggle').checked = false;
+    $('aaToggle').checked = false;
+    syncPostRows();
+  }
+}
+
+$('qualityTier').addEventListener('change', (event) => applyQualityTier(event.target.value));
+
 // Turntable
 bindSlider('ttRevolutions', () => {}, (v) => String(v));
 bindSlider('ttDuration', () => {}, (v) => `${v}s`);
@@ -652,6 +668,14 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   });
 
   await loadBundled(DEMO_MODEL, 'demo model');
+
+  // Pre-select the quality tier from the device probe and apply it. Placed
+  // right before settings.load(): if a session had explicitly saved a
+  // different tier, load()'s dispatched 'change' event runs applyQualityTier()
+  // again with the saved value, overriding this auto-detected default -
+  // exactly how every other restored control here already works.
+  $('qualityTier').value = viewer.detectedTier;
+  applyQualityTier(viewer.detectedTier);
 
   // Restore last session's lighting/tone-mapping/environment/AO/up-axis/panel
   // state now that a model exists for the up-axis restore to act on, then

@@ -46,6 +46,7 @@ import { measure, normalizeObject, frameCamera } from './frame.js';
 import { createOrientation } from './orientation.js';
 import { createAnimation } from './animation.js';
 import { createPostProcessing } from './post.js';
+import { detectCapabilityTier } from './capability.js';
 import {
   collectMaterials,
   setBaseColor,
@@ -95,7 +96,15 @@ export function createViewer({ container }) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
 
-  let resolutionScale = 1;
+  // Needs the renderer to exist (maxTextureSize is only known once WebGL
+  // context creation has actually queried the GPU), and needs to happen before
+  // createLightRig() below, since the tier picks the starting shadow map size.
+  const capability = detectCapabilityTier(renderer);
+
+  // Start at the tier's own default rather than always 1 -> applyQualityTier():
+  // avoids a low-end device briefly constructing at full resolution and a
+  // 2048 shadow map before main.js's startup call downscales it.
+  let resolutionScale = capability.tier === 'low' ? 0.75 : 1;
 
   function applySize() {
     const width = container.clientWidth || window.innerWidth;
@@ -153,7 +162,10 @@ export function createViewer({ container }) {
   // Closure over `loop`, declared just below — safe because this is only
   // called from a setter in response to user interaction, by which point
   // `loop` is assigned. Same pattern `post` uses for the same reason.
-  const lights = createLightRig(scene, { invalidate: (f) => loop.invalidate(f) });
+  const lights = createLightRig(scene, {
+    invalidate: (f) => loop.invalidate(f),
+    shadowMapSize: capability.tier === 'low' ? 1024 : 2048,
+  });
 
   // --- render loop ---------------------------------------------------------
 
@@ -757,6 +769,35 @@ export function createViewer({ container }) {
     setResolutionScale(value) {
       resolutionScale = value;
       applySize();
+    },
+
+    /** The device tier detected at construction — 'low' | 'medium' | 'high'. */
+    get detectedTier() {
+      return capability.tier;
+    },
+    get tierSignals() {
+      return capability.signals;
+    },
+
+    /**
+     * Apply a quality tier: resolution scale and shadow map resolution always;
+     * AO/AA are only ever forced *off* on 'low', as a performance ceiling —
+     * switching to 'medium'/'high' never auto-enables them, since that's a
+     * separate, already-independent choice (the AO/AA checkboxes). Matches how
+     * every other control in this app works: an explicit user choice, once
+     * made and persisted by settings.js, stands until the user changes it —
+     * this just picks the starting default for someone who never has.
+     *
+     * @param {'low'|'medium'|'high'} tier
+     */
+    applyQualityTier(tier) {
+      resolutionScale = tier === 'low' ? 0.75 : 1;
+      applySize();
+      lights.setShadowMapSize(tier === 'low' ? 1024 : 2048);
+      if (tier === 'low') {
+        post.setAO(false);
+        post.setAA(false);
+      }
     },
     setStageVisible(visible) {
       stageRoot.visible = visible;

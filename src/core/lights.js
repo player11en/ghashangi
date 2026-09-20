@@ -67,9 +67,16 @@ function ensureRectAreaLightUniforms() {
  * @param {object} [options]
  * @param {(frames?: number) => void} [options.invalidate]  Ask the render loop
  *   for a redraw. Every setter calls this itself now; nothing external needs to.
+ * @param {object} [options]
+ * @param {(frames?: number) => void} [options.invalidate]
+ * @param {number} [options.shadowMapSize=2048]  Starting resolution — 2048
+ *   rather than the old 1024, since the shadow camera is now fitted to the
+ *   subject instead of a fixed +/-10 box, so the extra resolution is actually
+ *   spent on the model. Track 1.5's capability tier picks a smaller starting
+ *   value on constrained devices; `setShadowMapSize()` below changes it later.
  * @returns {object} handles and setters.
  */
-export function createLightRig(scene, { invalidate = () => {} } = {}) {
+export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2048 } = {}) {
   ensureRectAreaLightUniforms();
 
   // Nominal radius the rig is designed at. fitTo() rescales from here.
@@ -80,11 +87,8 @@ export function createLightRig(scene, { invalidate = () => {} } = {}) {
 
   const sun = new DirectionalLight(0xffffff, LIGHT_DEFAULTS.sun);
   sun.castShadow = true;
-  // 2048 rather than the old 1024: with the shadow camera now fitted to the
-  // subject instead of a fixed +/-10 box, the extra resolution is actually
-  // spent on the model.
-  sun.shadow.mapSize.width = 2048;
-  sun.shadow.mapSize.height = 2048;
+  sun.shadow.mapSize.width = shadowMapSize;
+  sun.shadow.mapSize.height = shadowMapSize;
   // normalBias is the right tool for shadow acne on curved surfaces; the old
   // code used only a constant bias of -0.001, which trades acne for peter-
   // panning. A small constant bias on top handles flat coplanar cases.
@@ -176,6 +180,23 @@ export function createLightRig(scene, { invalidate = () => {} } = {}) {
     sun.shadow.needsUpdate = true;
   }
 
+  /**
+   * Change the shadow map's resolution, e.g. when the Quality control changes.
+   *
+   * `LightShadow.dispose()` frees the GPU render target but deliberately does
+   * not null out `.map` itself (checked in three's own source) — that null is
+   * what tells `WebGLShadowMap` to allocate a fresh one at the new
+   * `mapSize` on the next shadow pass, so it has to be done here explicitly.
+   */
+  function setShadowMapSize(size) {
+    if (sun.shadow.mapSize.width === size) return;
+    sun.shadow.mapSize.set(size, size);
+    sun.shadow.dispose();
+    sun.shadow.map = null;
+    requestShadowUpdate();
+    invalidate(2);
+  }
+
   return {
     ambient,
     sun,
@@ -184,6 +205,7 @@ export function createLightRig(scene, { invalidate = () => {} } = {}) {
     shadowCatcher,
     fitTo,
     requestShadowUpdate,
+    setShadowMapSize,
 
     setAmbient(v) {
       ambient.intensity = v;
