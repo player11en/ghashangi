@@ -83,8 +83,8 @@
           <input type="text" inputmode="decimal" class="value-input" id="heightOut" value="0.0" aria-label="Height value">
         </div>
         <div class="row row-buttons">
-          <button type="button" id="frameButton" class="button button-quiet">Frame</button>
-          <button type="button" id="resetButton" class="button button-quiet">Reset cam</button>
+          <button type="button" id="frameButton" class="button button-quiet" title="Shortcut: F">Frame</button>
+          <button type="button" id="resetButton" class="button button-quiet" title="Shortcut: R">Reset cam</button>
         </div>
         <div class="row row-check">
           <input type="checkbox" id="autoRotate">
@@ -96,7 +96,7 @@
         </div>
         <div class="row row-check">
           <input type="checkbox" id="wireframe">
-          <label for="wireframe">Wireframe</label>
+          <label for="wireframe" title="Shortcut: W">Wireframe</label>
         </div>
         </div>
       </section>
@@ -150,7 +150,7 @@
           <select id="clipSelect"></select>
         </div>
         <div class="row row-transport">
-          <button type="button" id="playPause" class="button" aria-label="Play">▶ Play</button>
+          <button type="button" id="playPause" class="button" aria-label="Play" title="Shortcut: Space">▶ Play</button>
           <output for="timeline" id="timeOut">0.00 / 0.00s</output>
         </div>
         <input type="range" id="timeline" class="timeline" min="0" max="1" step="0.001" value="0"
@@ -345,7 +345,7 @@
         <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="captureBody">Capture</button></h2>
         <div class="group-body" id="captureBody" hidden>
         <div class="row row-buttons">
-          <button type="button" id="screenshotButton" class="button">Screenshot</button>
+          <button type="button" id="screenshotButton" class="button" title="Shortcut: S">Screenshot</button>
         </div>
         <div class="row row-check">
           <input type="checkbox" id="shotTransparent">

@@ -7,6 +7,7 @@ import { createFileSource } from './sources/file.js';
 import { createMaterialsPanel } from './ui/materials-panel.js';
 import { createAnimationPanel } from './ui/animation-panel.js';
 import { createAccordion } from './ui/accordion.js';
+import { createShortcuts } from './ui/shortcuts.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
 import {
   loadModel,
@@ -49,6 +50,8 @@ const materialsPanel = createMaterialsPanel({ viewer, toasts });
 // section hides itself — animation-panel.js calls this at the end of its own
 // rebuild(), since viewer.onAnimationChange() only holds one callback.
 const accordion = createAccordion($('panelBody'), $('rail'));
+
+createShortcuts();
 
 // Registers its own viewer callback, so it rebuilds itself on every load.
 const animationPanel = createAnimationPanel({ viewer, onRebuild: accordion.syncRailVisibility });
