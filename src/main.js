@@ -8,6 +8,7 @@ import { createMaterialsPanel } from './ui/materials-panel.js';
 import { createAnimationPanel } from './ui/animation-panel.js';
 import { createAccordion } from './ui/accordion.js';
 import { createShortcuts } from './ui/shortcuts.js';
+import { createSettings } from './core/settings.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
 import {
   loadModel,
@@ -52,6 +53,8 @@ const materialsPanel = createMaterialsPanel({ viewer, toasts });
 const accordion = createAccordion($('panelBody'), $('rail'));
 
 createShortcuts();
+
+const settings = createSettings({ accordion, orientation: viewer.orientation });
 
 // Registers its own viewer callback, so it rebuilds itself on every load.
 const animationPanel = createAnimationPanel({ viewer, onRebuild: accordion.syncRailVisibility });
@@ -649,6 +652,15 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   });
 
   await loadBundled(DEMO_MODEL, 'demo model');
+
+  // Restore last session's lighting/tone-mapping/environment/AO/up-axis/panel
+  // state now that a model exists for the up-axis restore to act on, then
+  // start auto-saving. In that order, deliberately: load()'s own writes fire
+  // the same events a user's edit would, and watch() is not listening for
+  // them yet, so restoring never immediately re-triggers a save of the exact
+  // data it just read.
+  settings.load();
+  settings.watch();
 
   // The stage is decorative and tiny; load it after the subject so it never
   // delays first paint.

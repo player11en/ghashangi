@@ -14,26 +14,35 @@
 // consulted separately; syncRailVisibility() is what keeps the rail from
 // offering a jump to a section that has hidden itself.
 
-const $ = (id) => document.getElementById(id);
-
 /**
  * @param {HTMLElement} panelRoot  Contains the `.group` sections.
  * @param {HTMLElement} rail       Contains the `.rail-button`s.
- * @returns {{ syncRailVisibility: () => void }}
+ * @returns {{
+ *   syncRailVisibility: () => void,
+ *   setSectionOpen: (id: string, open: boolean) => void,
+ *   isSectionOpen: (id: string) => boolean,
+ *   sectionIds: () => string[],
+ * }}
  */
 export function createAccordion(panelRoot, rail) {
-  const sections = [...panelRoot.querySelectorAll('.group')];
-
   function setOpen(section, body, button, open) {
     body.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
   }
 
-  for (const section of sections) {
-    const button = section.querySelector('.group-title');
-    const body = section.querySelector('.group-body');
-    if (!button || !body) continue; // defensive: every section should have both
+  // Keyed by the same id a rail button's data-jump uses (`${id}Body` is the
+  // body element's real id) — one lookup shared by click handling, the rail,
+  // and settings.js's persisted-state restore, so there is exactly one place
+  // that resolves "section id" to its three elements.
+  const byId = new Map();
+  for (const body of panelRoot.querySelectorAll('.group-body')) {
+    const id = body.id.replace(/Body$/, '');
+    const section = body.closest('.group');
+    const button = section?.querySelector('.group-title');
+    if (section && button) byId.set(id, { section, body, button });
+  }
 
+  for (const { section, body, button } of byId.values()) {
     button.addEventListener('click', () => {
       setOpen(section, body, button, body.hidden);
     });
@@ -44,14 +53,10 @@ export function createAccordion(panelRoot, rail) {
   // exclusive single-open accordion.
   for (const railButton of rail.querySelectorAll('.rail-button')) {
     railButton.addEventListener('click', () => {
-      const id = railButton.dataset.jump;
-      const body = $(`${id}Body`);
-      const button = body?.closest('.group')?.querySelector('.group-title');
-      const section = body?.closest('.group');
-      if (!body || !button || !section) return;
-
-      if (body.hidden) setOpen(section, body, button, true);
-      section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const entry = byId.get(railButton.dataset.jump);
+      if (!entry) return;
+      if (entry.body.hidden) setOpen(entry.section, entry.body, entry.button, true);
+      entry.section.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   }
 
@@ -62,11 +67,27 @@ export function createAccordion(panelRoot, rail) {
    */
   function syncRailVisibility() {
     for (const railButton of rail.querySelectorAll('.rail-button')) {
-      const section = $(`${railButton.dataset.jump}Body`)?.closest('.group');
-      railButton.hidden = Boolean(section?.hidden);
+      railButton.hidden = Boolean(byId.get(railButton.dataset.jump)?.section.hidden);
     }
   }
 
   syncRailVisibility();
-  return { syncRailVisibility };
+
+  return {
+    syncRailVisibility,
+
+    /** Used by settings.js to restore last session's open/closed state. */
+    setSectionOpen(id, open) {
+      const entry = byId.get(id);
+      if (entry) setOpen(entry.section, entry.body, entry.button, open);
+    },
+
+    isSectionOpen(id) {
+      return !byId.get(id)?.body.hidden;
+    },
+
+    sectionIds() {
+      return [...byId.keys()];
+    },
+  };
 }
