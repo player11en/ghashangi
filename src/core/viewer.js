@@ -150,7 +150,10 @@ export function createViewer({ container }) {
   stageRoot.name = 'stageRoot';
   scene.add(stageRoot);
 
-  const lights = createLightRig(scene);
+  // Closure over `loop`, declared just below — safe because this is only
+  // called from a setter in response to user interaction, by which point
+  // `loop` is assigned. Same pattern `post` uses for the same reason.
+  const lights = createLightRig(scene, { invalidate: (f) => loop.invalidate(f) });
 
   // --- render loop ---------------------------------------------------------
 

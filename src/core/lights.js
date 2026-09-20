@@ -17,6 +17,15 @@
 // hardcoded y=5..6 and a radius of 6, which was tuned for one particular model
 // at its authored scale; with models normalised to a consistent size, the rig
 // has to scale with them or the lights end up inside the geometry.
+//
+// Bug found in review (2026-09-21): every setter here mutated a light and
+// returned, with no way to tell the render loop a redraw was needed. Under
+// on-demand rendering (0fps at rest by design) that meant a light slider only
+// "took" once something else invalidated the loop — in practice, orbiting the
+// camera. requestShadowUpdate() looked like it covered setSun/setAngle, but it
+// only sets shadow.needsUpdate, a flag for the *next* render, not a request for
+// one to happen. createLightRig now takes an `invalidate` callback, the same
+// pattern environment.js and post.js already use, and every setter calls it.
 
 import {
   AmbientLight,
@@ -55,10 +64,12 @@ function ensureRectAreaLightUniforms() {
  * Build the light rig and add it to the scene.
  *
  * @param {import('three').Scene} scene
- * @returns {object} handles and setters; every setter returns void and expects
- *   the caller to invalidate the render loop.
+ * @param {object} [options]
+ * @param {(frames?: number) => void} [options.invalidate]  Ask the render loop
+ *   for a redraw. Every setter calls this itself now; nothing external needs to.
+ * @returns {object} handles and setters.
  */
-export function createLightRig(scene) {
+export function createLightRig(scene, { invalidate = () => {} } = {}) {
   ensureRectAreaLightUniforms();
 
   // Nominal radius the rig is designed at. fitTo() rescales from here.
@@ -176,27 +187,33 @@ export function createLightRig(scene) {
 
     setAmbient(v) {
       ambient.intensity = v;
+      invalidate();
     },
     setSun(v) {
       sun.intensity = v;
       requestShadowUpdate();
+      invalidate(2);
     },
     setLeft(v) {
       left.intensity = v;
+      invalidate();
     },
     setRight(v) {
       right.intensity = v;
+      invalidate();
     },
     setAngle(degrees) {
       angle = degrees;
       applySunPosition();
       requestShadowUpdate();
+      invalidate(2);
     },
     getAngle() {
       return angle;
     },
     setShadowCatcherVisible(visible) {
       shadowCatcher.visible = visible;
+      invalidate();
     },
   };
 }
