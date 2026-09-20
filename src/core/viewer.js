@@ -370,9 +370,13 @@ export function createViewer({ container }) {
    * @param {object} [options]
    * @param {Array<import('three').AnimationClip>} [options.animations]
    * @param {boolean} [options.frame=true]  Reframe the camera onto it.
+   * @param {() => void} [options.onSimplifyStart]  Forwarded to
+   *   simplifyToTriangleBudget() - called only if the model actually exceeds
+   *   the triangle budget, so a caller can surface the (main-thread-
+   *   blocking) reduction work as "still working" rather than a freeze.
    * @returns {Promise<{bounds: object, normalized: object, clips: Array}>}
    */
-  async function setModel(object, { animations = [], frame = true } = {}) {
+  async function setModel(object, { animations = [], frame = true, onSimplifyStart } = {}) {
     clearModel();
 
     const normalized = normalizeObject(object);
@@ -387,7 +391,7 @@ export function createViewer({ container }) {
     // so replacing geometry here can't produce a visible pop from full detail
     // down to simplified. A model already under budget comes back untouched.
     simplificationResult = simplificationEnabled
-      ? await simplifyToTriangleBudget(object, simplificationBudget)
+      ? await simplifyToTriangleBudget(object, simplificationBudget, { onStart: onSimplifyStart })
       : null;
 
     modelRoot.rotation.set(0, 0, 0);
