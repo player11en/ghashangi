@@ -23,6 +23,20 @@
 
   <div id="toasts" class="toasts" role="log" aria-live="polite" aria-relevant="additions"></div>
 
+  <nav id="rail" class="rail" aria-label="Jump to panel section">
+      <button type="button" class="rail-button" data-jump="load" title="Load" aria-label="Jump to Load">LD</button>
+      <button type="button" class="rail-button" data-jump="model" title="Model" aria-label="Jump to Model">MO</button>
+      <button type="button" class="rail-button" data-jump="orientation" title="Orientation" aria-label="Jump to Orientation">OR</button>
+      <button type="button" class="rail-button" data-jump="animation" title="Animation" aria-label="Jump to Animation">AN</button>
+      <button type="button" class="rail-button" data-jump="materials" title="Materials" aria-label="Jump to Materials">MA</button>
+      <button type="button" class="rail-button" data-jump="colourways" title="Colourways" aria-label="Jump to Colourways">CO</button>
+      <button type="button" class="rail-button" data-jump="lighting" title="Lighting" aria-label="Jump to Lighting">LI</button>
+      <button type="button" class="rail-button" data-jump="environment" title="Environment" aria-label="Jump to Environment">EN</button>
+      <button type="button" class="rail-button" data-jump="capture" title="Capture" aria-label="Jump to Capture">CA</button>
+      <button type="button" class="rail-button" data-jump="turntable" title="Turntable" aria-label="Jump to Turntable">TT</button>
+      <button type="button" class="rail-button" data-jump="stats" title="Stats" aria-label="Jump to Stats">ST</button>
+    </nav>
+
   <aside id="panel" class="panel" aria-label="Viewer controls">
     <header class="panel-head">
       <h1 class="panel-title">3D Model Studio</h1>
@@ -32,7 +46,8 @@
 
     <div class="panel-body" id="panelBody">
       <section class="group">
-        <h2 class="group-title">Load</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="loadBody">Load</button></h2>
+        <div class="group-body" id="loadBody">
         <button type="button" id="openFile" class="button">Choose file…</button>
         <p class="hint">…or drop a file anywhere on the page.</p>
         <input type="file" id="fileInput" class="visually-hidden"
@@ -51,10 +66,12 @@
         </form>
 
         <button type="button" id="loadDemo" class="button button-quiet">Load demo model</button>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Model</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="modelBody">Model</button></h2>
+        <div class="group-body" id="modelBody">
         <div class="row">
           <label for="scaleSlider">Scale</label>
           <input type="range" id="scaleSlider" min="0.1" max="3" step="0.05" value="1">
@@ -81,10 +98,12 @@
           <input type="checkbox" id="wireframe">
           <label for="wireframe">Wireframe</label>
         </div>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Orientation</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="orientationBody">Orientation</button></h2>
+        <div class="group-body" id="orientationBody" hidden>
         <!-- Presets first: Z-up is what Blender, 3ds Max, most CAD kernels and
              most STLs export, so one click fixes the usual "it loaded on its
              side" case without anyone hunting for 90 degrees on a slider. -->
@@ -120,10 +139,12 @@
         </div>
 
         <button type="button" id="resetOrientation" class="button button-quiet">Reset orientation</button>
+        </div>
       </section>
 
       <section class="group" id="animationGroup" hidden>
-        <h2 class="group-title">Animation <span class="count" id="clipCount"></span></h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="animationBody">Animation <span class="count" id="clipCount"></span></button></h2>
+        <div class="group-body" id="animationBody" hidden>
         <div class="row">
           <label for="clipSelect">Clip</label>
           <select id="clipSelect"></select>
@@ -143,10 +164,12 @@
           <input type="checkbox" id="animLoop" checked>
           <label for="animLoop">Loop</label>
         </div>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Materials <span class="count" id="materialCount"></span></h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="materialsBody">Materials <span class="count" id="materialCount"></span></button></h2>
+        <div class="group-body" id="materialsBody">
 
         <ul class="material-list" id="materialList" role="listbox" aria-label="Materials"></ul>
 
@@ -195,10 +218,12 @@
             <button type="button" id="resetAllMaterials" class="button button-quiet">Reset all</button>
           </div>
         </div>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Colourways</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="colourwaysBody">Colourways</button></h2>
+        <div class="group-body" id="colourwaysBody">
         <ul class="colorway-list" id="colorwayList"></ul>
         <p class="hint" id="colorwayHint">Recolour the materials above, then save the result as a colourway.</p>
 
@@ -218,10 +243,12 @@
         </div>
         <button type="button" id="exportPngs" class="button">Export PNGs</button>
         <button type="button" id="exportGlb" class="button button-quiet">Export GLB</button>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Lighting</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="lightingBody">Lighting</button></h2>
+        <div class="group-body" id="lightingBody" hidden>
         <div class="row">
           <label for="ambientSlider">Ambient</label>
           <input type="range" id="ambientSlider" min="0" max="3" step="0.05" value="0.3">
@@ -251,10 +278,12 @@
           <input type="checkbox" id="shadowToggle" checked>
           <label for="shadowToggle">Shadows</label>
         </div>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Environment</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="environmentBody">Environment</button></h2>
+        <div class="group-body" id="environmentBody" hidden>
         <div class="row">
           <label for="exposureSlider">Exposure</label>
           <input type="range" id="exposureSlider" min="0" max="3" step="0.05" value="0.6">
@@ -309,10 +338,12 @@
           <input type="checkbox" id="aaToggle">
           <label for="aaToggle">Antialiasing (SMAA)</label>
         </div>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Capture</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="captureBody">Capture</button></h2>
+        <div class="group-body" id="captureBody" hidden>
         <div class="row row-buttons">
           <button type="button" id="screenshotButton" class="button">Screenshot</button>
         </div>
@@ -325,10 +356,12 @@
           <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
           <output for="shotScale" id="shotScaleOut">1×</output>
         </div>
+        </div>
       </section>
 
       <section class="group" id="turntableGroup">
-        <h2 class="group-title">Turntable</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="turntableBody">Turntable</button></h2>
+        <div class="group-body" id="turntableBody" hidden>
         <div class="row">
           <label for="ttRevolutions">Revolutions</label>
           <input type="range" id="ttRevolutions" min="1" max="4" step="1" value="1">
@@ -344,10 +377,12 @@
           Records a WebM. Note that WebM cannot carry transparency — use the
           colourway PNG export if you need an alpha channel.
         </p>
+        </div>
       </section>
 
       <section class="group">
-        <h2 class="group-title">Stats</h2>
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="statsBody">Stats</button></h2>
+        <div class="group-body" id="statsBody" hidden>
         <dl class="stats" id="stats">
           <dt>FPS</dt><dd id="statFps">—</dd>
           <dt>Triangles</dt><dd id="statTris">—</dd>
@@ -357,6 +392,7 @@
           <dt>Draw calls</dt><dd id="statCalls">—</dd>
           <dt>Textures</dt><dd id="statTextures">—</dd>
         </dl>
+        </div>
       </section>
     </div>
   </aside>

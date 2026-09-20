@@ -14,7 +14,7 @@ function formatTime(time, duration) {
  * @param {object} options
  * @param {object} options.viewer
  */
-export function createAnimationPanel({ viewer }) {
+export function createAnimationPanel({ viewer, onRebuild = () => {} }) {
   const group = $('animationGroup');
   const clipSelect = $('clipSelect');
   const playPause = $('playPause');
@@ -49,6 +49,10 @@ export function createAnimationPanel({ viewer }) {
     // Hidden rather than disabled: a static model has no animation, and an
     // empty transport is noise.
     group.hidden = !anim;
+    // The rail's Animation button should disappear along with the section —
+    // called here, unconditionally, since #animationGroup's own `hidden` is
+    // now final either way this function proceeds.
+    onRebuild();
     if (!anim) return;
 
     countEl.textContent = anim.clips.length > 1 ? `(${anim.clips.length})` : '';

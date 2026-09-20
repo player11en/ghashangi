@@ -26,6 +26,7 @@
   --radius-sm: 5px;
   --gap: 12px;
   --panel-width: 300px;
+  --rail-width: 34px;
 
   --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -86,6 +87,46 @@ body {
   height: 100%;
 }
 
+/* --- jump rail (Track 1.2) ------------------------------------------------ */
+/* Sits immediately left of the panel, same top/height, one button per
+   section — click to open it (if collapsed) and scroll it into view without
+   hunting through 11 sections of scroll. Hidden on narrow viewports; the
+   existing panel-collapse button is the one entry point there instead. */
+
+.rail {
+  position: fixed;
+  top: var(--gap);
+  right: calc(var(--gap) * 2 + var(--panel-width));
+  width: var(--rail-width);
+  max-height: calc(100dvh - var(--gap) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.rail-button {
+  flex: 0 0 auto;
+  padding: 7px 0;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.rail-button:hover {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* --- control panel ------------------------------------------------------- */
 
 .panel {
@@ -137,14 +178,52 @@ body {
 }
 .group:last-child { border-bottom: 0; }
 
+/* h2 carries heading semantics for screen-reader navigation; the actual
+   interactive control is the <button> inside it (Track 1.2) — a real button
+   gets keyboard/click handling for free, no reinvented role="button". */
+.group-heading {
+  margin: 0;
+}
+
 .group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
   margin: 0 0 10px;
+  padding: 0;
+  font: inherit;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--text-dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
 }
+.group-title:hover { color: var(--text); }
+
+/* Chevron, rotated when the section is open. A ::after pseudo-element rather
+   than a glyph in the markup, so it never fights with the <span class="count">
+   some headings already carry (Materials, Animation). */
+.group-title::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 120ms ease;
+  opacity: 0.6;
+}
+.group-title[aria-expanded='false']::after { transform: rotate(-45deg); }
+
+/* .group-body[hidden] already goes to display:none via the global [hidden]
+   rule declared near the top of this file — nothing extra needed here. */
 
 /* --- rows --------------------------------------------------------------- */
 
@@ -679,6 +758,10 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 3px; }
 
 @media (max-width: 720px) {
   :root { --panel-width: auto; }
+
+  /* One entry point on mobile, not two: the existing panel-collapse button
+     already does the job the rail exists for on desktop. */
+  .rail { display: none; }
 
   .panel {
     top: auto;
