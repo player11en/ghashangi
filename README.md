@@ -1,4 +1,6 @@
-# 3D Model Studio
+# Ghashangi
+
+**[ghashangi.playereleven.de](https://ghashangi.playereleven.de)**
 
 Load a 3D model in the browser, make it look good, and get publishable images
 and clips out of it. No install, no account, no upload — it opens and it works.
