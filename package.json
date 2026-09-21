@@ -8,7 +8,7 @@
   "author": "Zina",
   "repository": {
     "type": "git",
-    "url": "https://github.com/<your-github-username>/Ghashangi.git"
+    "url": "https://github.com/player11en/ghashangi.git"
   },
   "scripts": {
     "dev": "vite",
