@@ -246,6 +246,70 @@ await page.waitForTimeout(400);
 
 await page.evaluate(async () => { await window.__viewer.post.setAO(false); });
 
+// --- style effects (Track 4.3/4.4) ----------------------------------------
+//
+// Same fallback guarantee as AO: cycling every Style effect on and back off
+// must land pixel-identical to the untouched baseline, or the pipeline is
+// leaking state between the composer path and the direct-render fallback.
+// Each check re-converges damping (loop.invalidate + a real wait) before
+// capturing - skipping that produced a false "doesn't restore exactly"
+// result while this was being written, traced to OrbitControls damping
+// still settling between two back-to-back captures, not to anything these
+// passes did. Worth the extra few lines per check to not repeat that.
+
+console.log('\nStyle effects');
+
+async function settle(ms = 500) {
+  await page.evaluate(() => window.__viewer.loop.invalidate(3));
+  await page.waitForTimeout(ms);
+}
+
+await page.evaluate(async () => { await window.__viewer.post.setCrt(true); });
+await settle();
+const crtOn = await viewportHash();
+check('CRT changes the rendered image', crtOn !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setCrtPreset('vhs'));
+await settle();
+check('CRT preset change changes the rendered image', (await viewportHash()) !== crtOn);
+await page.evaluate(async () => { await window.__viewer.post.setCrt(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setBloom(true); });
+await settle();
+check('Bloom changes the rendered image', (await viewportHash()) !== baseline);
+await page.evaluate(async () => { await window.__viewer.post.setBloom(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setGlitch(true); });
+await settle();
+check('Glitch changes the rendered image', (await viewportHash()) !== baseline);
+await page.evaluate(async () => { await window.__viewer.post.setGlitch(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setPalette(true); });
+await settle();
+const paletteOn = await viewportHash();
+check('Palette changes the rendered image', paletteOn !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setPaletteName('genesis'));
+await settle();
+check('Palette swap changes the rendered image', (await viewportHash()) !== paletteOn);
+await page.evaluate(async () => { await window.__viewer.post.setPalette(false); });
+
+await settle();
+check('cycling every Style effect off restores the original image exactly', (await viewportHash()) === baseline);
+
+const idleWithCrt = await page.evaluate(async () => {
+  const v = window.__viewer;
+  await v.post.setCrt(true);
+  for (let i = 0; i < 2000 && v.controls.update(1 / 60); i++) { /* converge damping */ }
+  await new Promise((r) => setTimeout(r, 900));
+  const start = v.loop.stats.rendered;
+  await new Promise((r) => setTimeout(r, 900));
+  const rendered = v.loop.stats.rendered - start;
+  await v.post.setCrt(false);
+  return rendered;
+});
+check('loop still idles at zero with CRT on', idleWithCrt === 0, `${idleWithCrt} frames in 900ms`);
+
 // --- turntable -----------------------------------------------------------
 //
 // Diagnosed on the first real run, before writing any of this: canvas

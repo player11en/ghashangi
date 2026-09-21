@@ -27,6 +27,10 @@ import {
 import { fetchFromDrive, looksLikeDriveLink, isDriveConfigured } from './sources/drive.js';
 import { trackObjectUrl, revokeObjectUrl } from './core/dispose.js';
 import { recordTurntable, isTurntableSupported } from './core/turntable.js';
+import { createCameraPath } from './core/camera-path.js';
+import { createCameraPathPanel } from './ui/camera-path-panel.js';
+import { isClipRecordingSupported } from './core/recorder.js';
+import { logSessionStart, logExport, markStyleTouched } from './core/telemetry.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,6 +46,7 @@ const progress = createProgress({
 });
 
 viewer.start();
+logSessionStart();
 
 const materialsPanel = createMaterialsPanel({ viewer, toasts });
 
@@ -65,6 +70,27 @@ let currentFs = null;
 
 // Used to name exported files after the model they came from.
 let currentModelName = 'model';
+
+// Camera path: not tied to a model load the way animation clips are, so it
+// persists across model swaps (a camera move framed for one product is a
+// reasonable starting point for the next one, unlike a model's own clips).
+let rebuildWaypointList = () => {};
+const cameraPath = createCameraPath({ viewer, onChange: () => rebuildWaypointList() });
+const cameraPathPanel = createCameraPathPanel({
+  viewer,
+  cameraPath,
+  toasts,
+  getModelName: () => currentModelName,
+  container: $('viewport'),
+  recordingSupported: isClipRecordingSupported(),
+});
+rebuildWaypointList = cameraPathPanel.rebuildList;
+
+if (!isClipRecordingSupported()) {
+  $('cameraPathHint').textContent =
+    'This browser cannot record WebM, so clips can’t be exported here, but Preview still works. Try Chrome or Firefox to record.';
+  $('cameraPathHint').dataset.level = 'warn';
+}
 
 // --- loading -------------------------------------------------------------
 
@@ -115,7 +141,13 @@ async function loadFromFiles(files) {
 
 /** Swap in a freshly loaded object and retire the previous one's resources. */
 async function install(object, animations, fs, name = 'model') {
-  await viewer.setModel(object, { animations });
+  await viewer.setModel(object, {
+    animations,
+    // Simplification is a synchronous WASM call under the hood; this only
+    // fires if the model actually exceeds the triangle budget, turning what
+    // would otherwise read as a frozen tab into a visible "still working".
+    onSimplifyStart: () => progress.update(null, 'Simplifying geometry…'),
+  });
   currentFs?.dispose();
   currentFs = fs ?? null;
   currentModelName = name;
@@ -514,17 +546,104 @@ bindSlider('aoIntensity', (v) => viewer.post.setAOIntensity(v), fixed2);
 bindSlider('aoRadius', (v) => viewer.post.setAORadius(v), fixed2);
 syncPostRows();
 
-// Quality tier: resolution scale and shadow map size always; AO/AA are only
-// ever forced *off* on 'low' (see viewer.js's applyQualityTier doc comment) -
-// bypassing the checkboxes' own click handlers, which would replay a network
-// fetch for passes that may already be loaded, so the checkbox/row UI is
-// synced here directly instead.
+// Style effects (CRT / bloom / glitch / retro palette). Same pipeline, same
+// pattern as AO/AA just above - each toggle reveals its own rows, lazy-
+// builds the composer on first enable, and reports failure the same way.
+// markStyleTouched() fires on the first control actually used, wherever that
+// is - the checkbox toggles cover it, since nothing else here can be reached
+// without one of those being on first.
+function syncStyleRows() {
+  for (const [flag, selector] of [
+    ['crtToggle', '[data-crt]'],
+    ['bloomToggle', '[data-bloom]'],
+    ['glitchToggle', '[data-glitch]'],
+    ['paletteToggle', '[data-palette]'],
+  ]) {
+    const on = $(flag).checked;
+    for (const row of document.querySelectorAll(selector)) row.hidden = !on;
+  }
+}
+
+bindCheckbox('crtToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setCrt(on);
+  } catch (error) {
+    console.error('[3DMViewer] CRT effect failed to initialise', error);
+    toasts.error('Could not enable CRT', String(error.message));
+    $('crtToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('crtPreset').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setCrtPreset(event.target.value);
+});
+
+bindCheckbox('bloomToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setBloom(on);
+  } catch (error) {
+    console.error('[3DMViewer] bloom failed to initialise', error);
+    toasts.error('Could not enable bloom', String(error.message));
+    $('bloomToggle').checked = false;
+    syncStyleRows();
+  }
+});
+bindSlider('bloomStrength', (v) => viewer.post.setBloomStrength(v), fixed2);
+
+bindCheckbox('glitchToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setGlitch(on);
+  } catch (error) {
+    console.error('[3DMViewer] glitch failed to initialise', error);
+    toasts.error('Could not enable glitch', String(error.message));
+    $('glitchToggle').checked = false;
+    syncStyleRows();
+  }
+});
+bindCheckbox('glitchWild', (on) => viewer.post.setGlitchWild(on));
+
+bindCheckbox('paletteToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setPalette(on);
+  } catch (error) {
+    console.error('[3DMViewer] retro palette failed to initialise', error);
+    toasts.error('Could not enable the retro palette', String(error.message));
+    $('paletteToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('paletteName').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setPaletteName(event.target.value);
+});
+bindSlider('pixelSize', (v) => viewer.post.setPixelSize(v), (v) => `${v}px`);
+syncStyleRows();
+
+// Quality tier: resolution scale and shadow map size always; AO/AA/Style are
+// only ever forced *off* on 'low' (see viewer.js's applyQualityTier doc
+// comment) - bypassing the checkboxes' own click handlers, which would
+// replay a network fetch for passes that may already be loaded, so the
+// checkbox/row UI is synced here directly instead.
 function applyQualityTier(tier) {
   viewer.applyQualityTier(tier);
   if (tier === 'low') {
     $('aoToggle').checked = false;
     $('aaToggle').checked = false;
+    $('crtToggle').checked = false;
+    $('bloomToggle').checked = false;
+    $('glitchToggle').checked = false;
+    $('paletteToggle').checked = false;
     syncPostRows();
+    syncStyleRows();
   }
 }
 
@@ -565,6 +684,7 @@ $('recordTurntable').addEventListener('click', async () => {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
 
+    logExport('webm');
     toasts.info('Turntable recorded', formatBytes(blob.size));
   } catch (error) {
     if (error.name !== 'AbortError') {
@@ -645,7 +765,8 @@ function refreshStats() {
   $('statSimplify').textContent = !simplification
     ? '—'
     : simplification.applied
-      ? `${simplification.original.toLocaleString()} → ${simplification.simplified.toLocaleString()}`
+      ? `${simplification.original.toLocaleString()} → ${simplification.simplified.toLocaleString()}` +
+        (simplification.skinnedExcluded ? ' (skinned mesh kept full-detail)' : '')
       : 'under budget';
 }
 
@@ -665,6 +786,7 @@ setInterval(() => {
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   window.__viewer = viewer;
   window.__materials = materialsPanel;
+  window.__cameraPath = cameraPath;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;
   window.__loadLink = loadFromLink;

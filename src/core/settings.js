@@ -43,6 +43,17 @@ const FIELDS = [
   { id: 'qualityTier', kind: 'select' },
   { id: 'simplifyToggle', kind: 'checkbox' },
   { id: 'simplifyBudget', kind: 'range' },
+  { id: 'crtToggle', kind: 'checkbox' },
+  { id: 'crtPreset', kind: 'select' },
+  { id: 'bloomToggle', kind: 'checkbox' },
+  { id: 'bloomStrength', kind: 'range' },
+  { id: 'glitchToggle', kind: 'checkbox' },
+  { id: 'glitchWild', kind: 'checkbox' },
+  { id: 'paletteToggle', kind: 'checkbox' },
+  { id: 'paletteName', kind: 'select' },
+  { id: 'pixelSize', kind: 'range' },
+  { id: 'cpDuration', kind: 'range' },
+  { id: 'cpAspect', kind: 'select' },
 ];
 
 function readField({ id, kind }) {

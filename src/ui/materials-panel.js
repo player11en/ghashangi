@@ -6,6 +6,7 @@
 
 import { readMaterial } from '../core/materials.js';
 import { createColorways, exportColorwayPNGs, exportGLB } from '../core/colorways.js';
+import { logExport } from '../core/telemetry.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -389,6 +390,7 @@ export function createMaterialsPanel({ viewer, toasts }) {
         },
       });
       download(zip, `${modelName}-colorways.zip`);
+      logExport('png');
       toasts.info(`Exported ${set.length} image${set.length === 1 ? '' : 's'}`);
     } catch (error) {
       console.error('[3DMViewer] colourway export failed', error);
@@ -409,6 +411,7 @@ export function createMaterialsPanel({ viewer, toasts }) {
     try {
       const blob = await exportGLB(viewer);
       download(blob, `${modelName}-edited.glb`);
+      logExport('glb');
       toasts.info('Exported GLB', 'Material edits and orientation are baked in.');
     } catch (error) {
       console.error('[3DMViewer] GLB export failed', error);

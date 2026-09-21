@@ -54,21 +54,34 @@
 // own by construction.
 
 import { Vector2 } from 'three';
+import { createCrtShader, applyCrtPreset } from './passes/crt-pass.js';
+import { createPaletteShader, applyPalette } from './passes/palette-pass.js';
 
 /** Passes are imported on first enable, not at module load. */
 let modules = null;
 
 async function loadModules() {
   if (modules) return modules;
-  const [{ EffectComposer }, { RenderPass }, { GTAOPass }, { SMAAPass }, { OutputPass }] =
-    await Promise.all([
-      import('three/addons/postprocessing/EffectComposer.js'),
-      import('three/addons/postprocessing/RenderPass.js'),
-      import('three/addons/postprocessing/GTAOPass.js'),
-      import('three/addons/postprocessing/SMAAPass.js'),
-      import('three/addons/postprocessing/OutputPass.js'),
-    ]);
-  modules = { EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass };
+  const [
+    { EffectComposer },
+    { RenderPass },
+    { GTAOPass },
+    { SMAAPass },
+    { OutputPass },
+    { ShaderPass },
+    { UnrealBloomPass },
+    { GlitchPass },
+  ] = await Promise.all([
+    import('three/addons/postprocessing/EffectComposer.js'),
+    import('three/addons/postprocessing/RenderPass.js'),
+    import('three/addons/postprocessing/GTAOPass.js'),
+    import('three/addons/postprocessing/SMAAPass.js'),
+    import('three/addons/postprocessing/OutputPass.js'),
+    import('three/addons/postprocessing/ShaderPass.js'),
+    import('three/addons/postprocessing/UnrealBloomPass.js'),
+    import('three/addons/postprocessing/GlitchPass.js'),
+  ]);
+  modules = { EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass };
   return modules;
 }
 
@@ -83,15 +96,31 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let composer = null;
   let gtaoPass = null;
   let smaaPass = null;
+  let bloomPass = null;
+  let glitchPass = null;
+  let crtPass = null;
+  let palettePass = null;
 
   let aoEnabled = false;
   let aaEnabled = false;
+  let bloomEnabled = false;
+  let glitchEnabled = false;
+  let crtEnabled = false;
+  let paletteEnabled = false;
+
   let aoIntensity = 1;
   // Fraction of the subject's radius. A fixed world-space radius would be
   // wrong for the same reason the original's fixed ±10 shadow box was wrong:
   // models are normalised to a consistent size, but that size is arbitrary.
   let aoRadiusFactor = 0.25;
   let subjectRadius = 5;
+
+  let bloomStrength = 0.6;
+  let bloomRadius = 0.4;
+  let bloomThreshold = 0.7;
+  let crtPreset = 'arcade';
+  let paletteName = 'gba';
+  let pixelSize = 4;
 
   // renderer.getSize() calls target.set(), so it needs a real Vector2 — a plain
   // {x, y} throws.
@@ -104,11 +133,13 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   /** True when any effect wants the composer. */
   function active() {
-    return aoEnabled || aaEnabled;
+    return aoEnabled || aaEnabled || bloomEnabled || glitchEnabled || crtEnabled || paletteEnabled;
   }
 
   async function build(width, height) {
-    const { EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass } = await loadModules();
+    const {
+      EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
+    } = await loadModules();
     if (composer) return;
 
     composer = new EffectComposer(renderer);
@@ -122,14 +153,48 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     smaaPass.enabled = aaEnabled;
     composer.addPass(smaaPass);
 
+    // Composite order below is pinned deliberately, not incidental:
+    //
+    //   Bloom -> Palette (pixelate+dither+quantize) -> CRT -> Glitch
+    //
+    // Bloom before palette, not after: bloom-after-palette would let glow
+    // bleed between fixed-palette colors before the final quantize, which
+    // reads as "a modern filter over a retro image." Bloom-before still gets
+    // every bloomed pixel snapped to the palette on its way out - the
+    // fixed-palette guarantee holds either way, but only bloom-first gives
+    // the "GBA screenshot" look this is for.
+    //
+    // Glitch after CRT, not before: reads as the CRT signal itself breaking
+    // up (a struggling TV) rather than a corrupted source feed underneath a
+    // working CRT - the more common real-world reference.
+    bloomPass = new UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
+    bloomPass.enabled = bloomEnabled;
+    composer.addPass(bloomPass);
+
+    palettePass = new ShaderPass(createPaletteShader());
+    palettePass.enabled = paletteEnabled;
+    composer.addPass(palettePass);
+
+    crtPass = new ShaderPass(createCrtShader());
+    crtPass.enabled = crtEnabled;
+    composer.addPass(crtPass);
+
+    glitchPass = new GlitchPass();
+    glitchPass.enabled = glitchEnabled;
+    composer.addPass(glitchPass);
+
     // Must be last: it performs tone mapping and the sRGB conversion that the
     // renderer would otherwise do on its own. Reads renderer.toneMapping
     // itself, unmodified by anything above it — see the file header.
     composer.addPass(new OutputPass());
 
     applyAO();
+    applyCrtPreset(crtPass, crtPreset);
+    applyPalette(palettePass, paletteName);
+    palettePass.uniforms.pixelSize.value = pixelSize;
     composer.setSize(width, height);
     composer.setPixelRatio(renderer.getPixelRatio());
+    applyResolutionUniforms(width, height);
   }
 
   function applyAO() {
@@ -144,6 +209,15 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       thickness: 1,
       scale: 1,
     });
+  }
+
+  /** CRT and palette both need the real pixel resolution for their grids. */
+  function applyResolutionUniforms(width, height) {
+    const ratio = renderer.getPixelRatio();
+    const pixelWidth = width * ratio;
+    const pixelHeight = height * ratio;
+    if (crtPass) crtPass.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (palettePass) palettePass.uniforms.uResolution.value = [pixelWidth, pixelHeight];
   }
 
   return {
@@ -195,20 +269,112 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       applyAO();
     },
 
+    // --- Style effects (Track 4.3/4.4) --------------------------------------
+    // Same shape as setAO/setAA above throughout: lazy-build the composer on
+    // first enable, keep local state so a later build() (or a tier default)
+    // can re-apply it, invalidate(2) so a shadow-adjacent redraw settles.
+
+    async setBloom(enabled) {
+      bloomEnabled = enabled;
+      if (enabled && !composer) {
+        const size = currentSize();
+        await build(size.x, size.y);
+      }
+      if (bloomPass) bloomPass.enabled = enabled;
+      invalidate(2);
+    },
+
+    setBloomStrength(value) {
+      bloomStrength = value;
+      if (bloomPass) bloomPass.strength = value;
+      invalidate(2);
+    },
+
+    setBloomRadius(value) {
+      bloomRadius = value;
+      if (bloomPass) bloomPass.radius = value;
+      invalidate(2);
+    },
+
+    setBloomThreshold(value) {
+      bloomThreshold = value;
+      if (bloomPass) bloomPass.threshold = value;
+      invalidate(2);
+    },
+
+    async setGlitch(enabled) {
+      glitchEnabled = enabled;
+      if (enabled && !composer) {
+        const size = currentSize();
+        await build(size.x, size.y);
+      }
+      if (glitchPass) glitchPass.enabled = enabled;
+      invalidate(2);
+    },
+
+    setGlitchWild(wild) {
+      if (glitchPass) glitchPass.goWild = wild;
+      invalidate(2);
+    },
+
+    async setCrt(enabled) {
+      crtEnabled = enabled;
+      if (enabled && !composer) {
+        const size = currentSize();
+        await build(size.x, size.y);
+      }
+      if (crtPass) crtPass.enabled = enabled;
+      invalidate(2);
+    },
+
+    setCrtPreset(name) {
+      crtPreset = name;
+      if (crtPass) applyCrtPreset(crtPass, name);
+      invalidate(2);
+    },
+
+    async setPalette(enabled) {
+      paletteEnabled = enabled;
+      if (enabled && !composer) {
+        const size = currentSize();
+        await build(size.x, size.y);
+      }
+      if (palettePass) palettePass.enabled = enabled;
+      invalidate(2);
+    },
+
+    setPaletteName(name) {
+      paletteName = name;
+      if (palettePass) applyPalette(palettePass, name);
+      invalidate(2);
+    },
+
+    setPixelSize(value) {
+      pixelSize = value;
+      if (palettePass) palettePass.uniforms.pixelSize.value = value;
+      invalidate(2);
+    },
+
     setSize(width, height) {
       if (!composer) return;
       composer.setSize(width, height);
       composer.setPixelRatio(renderer.getPixelRatio());
       gtaoPass?.setSize(width, height);
+      bloomPass?.setSize(width, height);
+      applyResolutionUniforms(width, height);
     },
 
     /**
      * The render call handed to the loop and to captureScreenshot().
      *
      * Deliberately does not touch renderer.toneMapping — see the file header
-     * for why nothing here needs to.
+     * for why nothing here needs to. CRT's uTime is advanced here rather than
+     * from the render loop's own update(), since it only matters for the one
+     * frame actually about to be drawn — no reason to touch it when nothing
+     * is rendering.
      */
     render() {
+      if (crtPass) crtPass.uniforms.uTime.value = performance.now() / 1000;
       if (active() && composer) composer.render();
       else renderer.render(scene, camera);
     },
@@ -217,9 +383,17 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer?.dispose();
       gtaoPass?.dispose?.();
       smaaPass?.dispose?.();
+      bloomPass?.dispose?.();
+      glitchPass?.dispose?.();
+      crtPass?.dispose?.();
+      palettePass?.dispose?.();
       composer = null;
       gtaoPass = null;
       smaaPass = null;
+      bloomPass = null;
+      glitchPass = null;
+      crtPass = null;
+      palettePass = null;
     },
   };
 }

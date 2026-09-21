@@ -32,7 +32,9 @@
       <button type="button" class="rail-button" data-jump="colourways" title="Colourways" aria-label="Jump to Colourways">CO</button>
       <button type="button" class="rail-button" data-jump="lighting" title="Lighting" aria-label="Jump to Lighting">LI</button>
       <button type="button" class="rail-button" data-jump="environment" title="Environment" aria-label="Jump to Environment">EN</button>
+      <button type="button" class="rail-button" data-jump="style" title="Style" aria-label="Jump to Style">SY</button>
       <button type="button" class="rail-button" data-jump="capture" title="Capture" aria-label="Jump to Capture">CA</button>
+      <button type="button" class="rail-button" data-jump="cameraPath" title="Camera Path" aria-label="Jump to Camera Path">CP</button>
       <button type="button" class="rail-button" data-jump="turntable" title="Turntable" aria-label="Jump to Turntable">TT</button>
       <button type="button" class="rail-button" data-jump="stats" title="Stats" aria-label="Jump to Stats">ST</button>
     </nav>
@@ -350,6 +352,62 @@
       </section>
 
       <section class="group">
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="styleBody">Style</button></h2>
+        <div class="group-body" id="styleBody" hidden>
+        <div class="row row-check">
+          <input type="checkbox" id="crtToggle">
+          <label for="crtToggle">CRT</label>
+        </div>
+        <div class="row" data-crt>
+          <label for="crtPreset">CRT look</label>
+          <select id="crtPreset">
+            <option value="arcade" selected>Arcade</option>
+            <option value="vhs">VHS</option>
+            <option value="oldtv">Old TV</option>
+          </select>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="bloomToggle">
+          <label for="bloomToggle">Bloom</label>
+        </div>
+        <div class="row" data-bloom>
+          <label for="bloomStrength">Bloom strength</label>
+          <input type="range" id="bloomStrength" min="0" max="2" step="0.05" value="0.6">
+          <input type="text" inputmode="decimal" class="value-input" id="bloomStrengthOut" value="0.60" aria-label="Bloom strength value">
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="glitchToggle">
+          <label for="glitchToggle">Glitch</label>
+        </div>
+        <div class="row row-check" data-glitch>
+          <input type="checkbox" id="glitchWild">
+          <label for="glitchWild">Wild mode</label>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="paletteToggle">
+          <label for="paletteToggle">Retro palette</label>
+        </div>
+        <div class="row" data-palette>
+          <label for="paletteName">Palette</label>
+          <select id="paletteName">
+            <option value="gba" selected>Game Boy</option>
+            <option value="genesis">Genesis</option>
+            <option value="atari">Atari</option>
+          </select>
+        </div>
+        <div class="row" data-palette>
+          <label for="pixelSize">Pixel size</label>
+          <input type="range" id="pixelSize" min="1" max="16" step="1" value="4">
+          <output for="pixelSize" id="pixelSizeOut">4px</output>
+        </div>
+        <p class="hint" id="styleHint">
+          Renders through the same post-processing pipeline as ambient
+          occlusion above, and shows up in every screenshot and recorded clip.
+        </p>
+        </div>
+      </section>
+
+      <section class="group">
         <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="captureBody">Capture</button></h2>
         <div class="group-body" id="captureBody" hidden>
         <div class="row row-buttons">
@@ -364,6 +422,45 @@
           <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
           <output for="shotScale" id="shotScaleOut">1×</output>
         </div>
+        </div>
+      </section>
+
+      <section class="group" id="cameraPathGroup">
+        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="cameraPathBody">Camera Path</button></h2>
+        <div class="group-body" id="cameraPathBody" hidden>
+        <div class="row">
+          <label for="cpWaypoints">Waypoints</label>
+          <select id="cpWaypoints"></select>
+        </div>
+        <div class="row row-buttons">
+          <button type="button" id="cpAddWaypoint" class="button button-quiet">Add waypoint here</button>
+          <button type="button" id="cpRemoveWaypoint" class="button button-quiet" disabled>Remove</button>
+        </div>
+        <div class="row">
+          <label for="cpDuration">Duration</label>
+          <input type="range" id="cpDuration" min="3" max="15" step="1" value="8">
+          <output for="cpDuration" id="cpDurationOut">8s</output>
+        </div>
+        <div class="row">
+          <label for="cpAspect">Aspect</label>
+          <select id="cpAspect">
+            <option value="free" selected>Free</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="cpScrub">Scrub</label>
+          <input type="range" id="cpScrub" min="0" max="1" step="0.001" value="0">
+        </div>
+        <div class="row row-buttons">
+          <button type="button" id="cpPreviewPlay" class="button button-quiet" disabled>▶ Preview</button>
+          <button type="button" id="cpRecord" class="button" disabled>Record clip</button>
+        </div>
+        <p class="hint" id="cameraPathHint">
+          Position the view and click "Add waypoint here" at least twice, then
+          preview or record the camera move between them as a clip.
+        </p>
         </div>
       </section>
 

@@ -48,6 +48,7 @@ import { createAnimation } from './animation.js';
 import { createPostProcessing } from './post.js';
 import { detectCapabilityTier } from './capability.js';
 import { simplifyToTriangleBudget, DEFAULT_TRIANGLE_BUDGET } from './simplify.js';
+import { markMaterialsTouched } from './telemetry.js';
 import {
   collectMaterials,
   setBaseColor,
@@ -325,6 +326,10 @@ export function createViewer({ container }) {
   function afterMaterialChange() {
     lights.requestShadowUpdate();
     loop.invalidate(2);
+    // The single chokepoint every material-affecting call already goes
+    // through (manual edits, resets, colourway apply) - one place to log
+    // "materials were touched this session" rather than one call per control.
+    markMaterialsTouched();
   }
 
   /** Apply the scale and height sliders on top of the baked normalisation. */
@@ -657,6 +662,22 @@ export function createViewer({ container }) {
     },
 
     /**
+     * Recompute size from the container right now, synchronously - rather
+     * than waiting for the ResizeObserver to notice. Found necessary for
+     * Track 4.6's aspect-ratio lock: measured the ResizeObserver path taking
+     * longer than 300ms to actually resize the canvas in roughly 2 of every
+     * 3 runs under headless Chromium + SwiftShader, which would silently
+     * record a clip's first frames at the wrong dimensions. A caller that
+     * changes the container's size and needs the canvas to match before
+     * doing anything else (starting a recording, capturing a screenshot)
+     * should call this immediately after, instead of assuming the observer
+     * has already fired.
+     */
+    resize() {
+      applySize();
+    },
+
+    /**
      * Install a per-frame hook, or pass null to remove it. Runs last in the
      * loop's update, so it can override auto-rotate. Exclusive: setting one
      * replaces any previous hook.
@@ -836,6 +857,16 @@ export function createViewer({ container }) {
       if (tier === 'low') {
         post.setAO(false);
         post.setAA(false);
+        // Same rule extended to Track 4's Style stack: four more full-screen
+        // passes on top of GTAO+SMAA is real cost, and a device that just had
+        // AO/AA forced off for performance shouldn't have Style effects
+        // default on and undo that. Only ever forces off, same as above -
+        // never auto-enables on medium/high, and a user's explicit choice via
+        // settings.js still wins once made.
+        post.setBloom(false);
+        post.setGlitch(false);
+        post.setCrt(false);
+        post.setPalette(false);
       }
     },
     setStageVisible(visible) {
