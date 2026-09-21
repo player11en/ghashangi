@@ -79,6 +79,7 @@ async function loadModules() {
     { UnrealBloomPass },
     { GlitchPass },
     { AfterimagePass },
+    { BokehPass },
   ] = await Promise.all([
     import('three/addons/postprocessing/EffectComposer.js'),
     import('three/addons/postprocessing/RenderPass.js'),
@@ -89,10 +90,11 @@ async function loadModules() {
     import('three/addons/postprocessing/UnrealBloomPass.js'),
     import('three/addons/postprocessing/GlitchPass.js'),
     import('three/addons/postprocessing/AfterimagePass.js'),
+    import('three/addons/postprocessing/BokehPass.js'),
   ]);
   modules = {
     EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
-    AfterimagePass,
+    AfterimagePass, BokehPass,
   };
   return modules;
 }
@@ -132,6 +134,22 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   let aoEnabled = false;
   let aaEnabled = false;
+  let dofEnabled = false;
+  let dofPass = null;
+
+  // Focus is a world-space distance along the camera's look direction, so a
+  // sane default depends entirely on how far the camera sits from the
+  // subject - which normalizeObject() makes predictable. Seeded from the
+  // subject's own bounds in setSubject(), the same way the AO radius is,
+  // rather than starting at three's default 1.0 and making every first use
+  // begin with a slider hunt through an entirely blurred image.
+  let dofFocus = 18;
+  let dofAperture = 0.002;
+  let dofMaxBlur = 0.01;
+  // Once someone sets focus by hand, stop overwriting it on the next model
+  // load - the same "an explicit choice stands" rule the quality tier and
+  // every Style default already follow.
+  let dofTouched = false;
 
   let aoIntensity = 1;
   // Fraction of the subject's radius. A fixed world-space radius would be
@@ -162,7 +180,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   /** True when any effect wants the composer. */
   function active() {
-    return aoEnabled || aaEnabled || Object.values(styleEnabled).some(Boolean);
+    return aoEnabled || aaEnabled || dofEnabled || Object.values(styleEnabled).some(Boolean);
   }
 
   /** How many Style (non-fidelity) effects are currently on - see setSize's caller in Track 5.1. */
@@ -173,7 +191,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   async function build(width, height) {
     const {
       EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
-      AfterimagePass,
+      AfterimagePass, BokehPass,
     } = await loadModules();
     if (composer) return;
 
@@ -187,6 +205,22 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     smaaPass = new SMAAPass();
     smaaPass.enabled = aaEnabled;
     composer.addPass(smaaPass);
+
+    // Depth of field sits in the fixed fidelity prefix, NOT the reorderable
+    // Style band - and that is a correctness constraint, not a preference.
+    // BokehPass renders its own depth pass of the real scene (which is why
+    // it takes scene/camera at all, like GTAOPass): it blurs by distance.
+    // Downstream of any Style pass there is no depth relationship left to
+    // blur against - a CRT-scanlined or ASCII-glyphed frame has thrown that
+    // information away - so it would be blurring an image that no longer
+    // corresponds to the geometry it is sampling depth from.
+    dofPass = new BokehPass(scene, camera, {
+      focus: dofFocus,
+      aperture: dofAperture,
+      maxblur: dofMaxBlur,
+    });
+    dofPass.enabled = dofEnabled;
+    composer.addPass(dofPass);
 
     // Default composite order below (STYLE_KEYS) is a starting point, not a
     // hard rule - reorderStyle() permutes it later. The reasoning that
@@ -255,7 +289,12 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
     if (!composer) return;
     const styleInstances = new Set(STYLE_KEYS.map((k) => passes[k]));
-    const insertAt = composer.passes.indexOf(smaaPass) + 1;
+    // Anchor to the LAST fidelity pass, not to SMAA specifically: DOF was
+    // added to that prefix after this function, and anchoring to SMAA would
+    // silently re-splice the whole Style band in front of it, inverting the
+    // fidelity-then-style order every pass here depends on.
+    const lastFixed = dofPass ?? smaaPass;
+    const insertAt = composer.passes.indexOf(lastFixed) + 1;
     composer.passes = composer.passes.filter((p) => !styleInstances.has(p));
     composer.passes.splice(insertAt, 0, ...styleOrder.map((k) => passes[k]));
     invalidate(2);
@@ -368,6 +407,69 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       if (!bounds) return;
       subjectRadius = Math.max(bounds.radius, 0.01);
       applyAO();
+      // Seed DOF's focus distance from the subject too, for the same reason
+      // the AO radius is scoped here: both are world-space distances, and a
+      // model normalised to ~10 units needs a different one than a model
+      // left at 0.01. frameCamera() puts the camera at roughly 2.2x the
+      // subject radius, so focusing there lands on the subject rather than
+      // in front of or behind it.
+      if (!dofTouched) {
+        dofFocus = subjectRadius * 2.2;
+        if (dofPass) dofPass.uniforms.focus.value = dofFocus;
+      }
+    },
+
+    // --- depth of field (Track 6.1) ---------------------------------------
+    // Fidelity, not stylization: it lives beside AO/AA in the Environment
+    // group, and in the composer's fixed prefix. See build() for why.
+
+    async setDof(enabled) {
+      dofEnabled = enabled;
+      if (enabled && !composer) {
+        const size = currentSize();
+        await build(size.x, size.y);
+      }
+      if (dofPass) dofPass.enabled = enabled;
+      invalidate(2);
+    },
+
+    setDofFocus(value) {
+      dofFocus = value;
+      if (dofPass) dofPass.uniforms.focus.value = value;
+      invalidate(2);
+    },
+
+    /**
+     * Mark focus as deliberately chosen, so setSubject() stops re-seeding it
+     * on the next model load.
+     *
+     * Deliberately NOT folded into setDofFocus(): main.js's bindSlider()
+     * runs one initial apply() at wiring time to sync each control with its
+     * markup default, which would otherwise mark focus "touched" with the
+     * HTML default before any model had ever loaded - silently killing the
+     * seeding for the whole session. (Found by running it: focus stayed at
+     * 18 for a subject whose bounds wanted ~12.3.) Only a real 'input' event
+     * from the slider, or settings.js restoring a saved value, calls this.
+     */
+    markDofFocusTouched() {
+      dofTouched = true;
+    },
+
+    setDofAperture(value) {
+      dofAperture = value;
+      if (dofPass) dofPass.uniforms.aperture.value = value;
+      invalidate(2);
+    },
+
+    setDofMaxBlur(value) {
+      dofMaxBlur = value;
+      if (dofPass) dofPass.uniforms.maxblur.value = value;
+      invalidate(2);
+    },
+
+    /** Focus distance the subject seeding produced, so the UI can show it. */
+    get dofFocus() {
+      return dofFocus;
     },
 
     // --- Style effects (Track 4.3/4.4, extended in Track 5.3) ---------------
@@ -559,6 +661,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer.setSize(width, height);
       composer.setPixelRatio(renderer.getPixelRatio());
       gtaoPass?.setSize(width, height);
+      dofPass?.setSize(width, height);
       passes.bloom?.setSize(width, height);
       applyResolutionUniforms(width, height);
     },
@@ -587,6 +690,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer?.dispose();
       gtaoPass?.dispose?.();
       smaaPass?.dispose?.();
+      dofPass?.dispose?.();
       for (const key of STYLE_KEYS) {
         passes[key]?.dispose?.();
         passes[key] = null;
@@ -594,6 +698,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer = null;
       gtaoPass = null;
       smaaPass = null;
+      dofPass = null;
     },
   };
 }

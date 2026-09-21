@@ -174,6 +174,9 @@ async function install(object, animations, fs, name = 'model') {
   // A new model starts a fresh undo history - the previous one's material
   // states describe materials that no longer exist.
   materialUndo.reset();
+  // setModel() -> refreshBounds() -> post.setSubject() has just re-seeded the
+  // DOF focus distance for this model's scale; pull the slider onto it.
+  syncDofFocusFromSubject();
 }
 
 /** Turn a loader failure into something a person can act on. */
@@ -540,6 +543,22 @@ $('toneMapping').addEventListener('change', (event) => {
 function syncPostRows() {
   const on = $('aoToggle').checked;
   for (const row of document.querySelectorAll('[data-ao]')) row.hidden = !on;
+  const dofOn = $('dofToggle').checked;
+  for (const row of document.querySelectorAll('[data-dof]')) row.hidden = !dofOn;
+}
+
+/**
+ * Pull the focus slider onto whatever post.js seeded from the subject's
+ * bounds, so enabling DOF on a freshly loaded model starts focused on the
+ * model rather than at a stale distance from the previous one. Skipped once
+ * the slider has been touched - post.js stops re-seeding at that point too.
+ */
+function syncDofFocusFromSubject() {
+  const slider = $('dofFocus');
+  const seeded = viewer.post.dofFocus;
+  if (!Number.isFinite(seeded)) return;
+  slider.value = String(Math.min(parseFloat(slider.max), Math.max(parseFloat(slider.min), seeded)));
+  $('dofFocusOut').value = parseFloat(slider.value).toFixed(1);
 }
 
 bindCheckbox('aoToggle', async (on) => {
@@ -567,6 +586,27 @@ bindCheckbox('aaToggle', async (on) => {
 });
 bindSlider('aoIntensity', (v) => viewer.post.setAOIntensity(v), fixed2);
 bindSlider('aoRadius', (v) => viewer.post.setAORadius(v), fixed2);
+
+bindCheckbox('dofToggle', async (on) => {
+  syncPostRows();
+  if (on) syncDofFocusFromSubject();
+  try {
+    await viewer.post.setDof(on);
+  } catch (error) {
+    console.error('[3DMViewer] depth of field failed to initialise', error);
+    toasts.error('Could not enable depth of field', String(error.message));
+    $('dofToggle').checked = false;
+    syncPostRows();
+  }
+});
+bindSlider('dofFocus', (v) => viewer.post.setDofFocus(v), fixed1);
+// A real drag (or settings.js restoring a saved value, which dispatches the
+// same event) is an explicit choice; bindSlider's own initial sync calls
+// apply() directly without dispatching, so it correctly doesn't count.
+$('dofFocus').addEventListener('input', () => viewer.post.markDofFocusTouched());
+bindSlider('dofAperture', (v) => viewer.post.setDofAperture(v), (v) => v.toFixed(4));
+bindSlider('dofMaxBlur', (v) => viewer.post.setDofMaxBlur(v), (v) => v.toFixed(3));
+
 syncPostRows();
 
 // Style effects (CRT / bloom / glitch / retro palette). Same pipeline, same
@@ -992,6 +1032,7 @@ function applyQualityTier(tier) {
   if (tier === 'low') {
     $('aoToggle').checked = false;
     $('aaToggle').checked = false;
+    $('dofToggle').checked = false;
     $('crtToggle').checked = false;
     $('bloomToggle').checked = false;
     $('glitchToggle').checked = false;

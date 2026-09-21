@@ -12,7 +12,12 @@ export default defineConfig(({ mode }) => ({
 
   build: {
     target: 'esnext',
-    sourcemap: true,
+    // Opt-in rather than always on: sourcemaps were 5.5 MB of a 15 MB dist -
+    // a third of the upload, on hosting where that may be a real quota. They
+    // are only ever fetched when devtools is open, so a normal deploy pays
+    // the space for nothing. `npm run build:maps` emits them when a
+    // production stack trace actually needs tracing back to real source.
+    sourcemap: mode === 'maps',
     // three is large; the warning fires on every build and tells us nothing
     // we are not already handling via manualChunks.
     chunkSizeWarningLimit: 1200,

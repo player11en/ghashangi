@@ -352,6 +352,29 @@
           <input type="checkbox" id="aaToggle">
           <label for="aaToggle">Antialiasing (SMAA)</label>
         </div>
+
+        <!-- Depth of field sits with AO/AA rather than in Style: it is a
+             lens property of the real 3D scene, and it reads scene depth,
+             which only exists ahead of any stylization pass. -->
+        <div class="row row-check">
+          <input type="checkbox" id="dofToggle">
+          <label for="dofToggle">Depth of field</label>
+        </div>
+        <div class="row" data-dof>
+          <label for="dofFocus">Focus distance</label>
+          <input type="range" id="dofFocus" min="0.5" max="60" step="0.5" value="18">
+          <input type="text" inputmode="decimal" class="value-input" id="dofFocusOut" value="18.0" aria-label="Focus distance value">
+        </div>
+        <div class="row" data-dof>
+          <label for="dofAperture">Aperture</label>
+          <input type="range" id="dofAperture" min="0" max="0.02" step="0.0005" value="0.002">
+          <output for="dofAperture" id="dofApertureOut">0.0020</output>
+        </div>
+        <div class="row" data-dof>
+          <label for="dofMaxBlur">Max blur</label>
+          <input type="range" id="dofMaxBlur" min="0" max="0.05" step="0.001" value="0.01">
+          <output for="dofMaxBlur" id="dofMaxBlurOut">0.010</output>
+        </div>
         </div>
       </section>
 

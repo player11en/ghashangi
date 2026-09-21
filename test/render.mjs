@@ -246,6 +246,57 @@ await page.waitForTimeout(400);
 
 await page.evaluate(async () => { await window.__viewer.post.setAO(false); });
 
+async function settle(ms = 500) {
+  await page.evaluate(() => window.__viewer.loop.invalidate(3));
+  await page.waitForTimeout(ms);
+}
+
+// --- depth of field (Track 6.1) -------------------------------------------
+//
+// DOF lives in the fidelity band next to AO/AA rather than in the reorderable
+// Style chain, because BokehPass renders its own depth pass - it needs real
+// scene depth, which no longer exists once a Style pass has rewritten the
+// image. So it gets AO's checks, not the Style chain's.
+
+console.log('\nDepth of field');
+
+// The focus distance must arrive seeded from the subject, not left at the
+// module default: a slider you have to hunt across three times before the
+// image looks focused is worse than no feature. Regression guard for a real
+// bug found while building this - bindSlider()'s initial apply() marked focus
+// as user-touched at wiring time, before any model existed, which suppressed
+// the seeding permanently.
+const dofSeed = await page.evaluate(() => ({
+  focus: window.__viewer.post.dofFocus,
+  radius: window.__viewer.bounds?.radius ?? null,
+}));
+check(
+  'DOF focus is seeded from the subject, not left at the default',
+  dofSeed.radius !== null && Math.abs(dofSeed.focus - dofSeed.radius * 2.2) < 0.01,
+  `focus ${dofSeed.focus}, radius ${dofSeed.radius}`,
+);
+
+await page.evaluate(async () => { await window.__viewer.post.setDof(true); });
+await settle(600);
+const dofOn = await viewportHash();
+check('DOF changes the rendered image', dofOn !== baseline);
+check('composer is active with DOF alone', await page.evaluate(() => window.__viewer.post.active));
+
+// Aperture must be a real dial, same standard AO's intensity is held to.
+await page.evaluate(() => window.__viewer.post.setDofAperture(0));
+await settle();
+const dofNoAperture = await viewportHash();
+
+await page.evaluate(() => window.__viewer.post.setDofAperture(0.02));
+await settle();
+check('DOF aperture 0 differs from a wide aperture', dofNoAperture !== (await viewportHash()));
+
+// The same fallback guarantee AO and every Style pass carry.
+await page.evaluate(async () => { await window.__viewer.post.setDof(false); });
+await settle();
+check('toggling DOF off restores the original image exactly', (await viewportHash()) === baseline);
+await page.evaluate(() => window.__viewer.post.setDofAperture(0.002));
+
 // --- style effects (Track 4.3/4.4) ----------------------------------------
 //
 // Same fallback guarantee as AO: cycling every Style effect on and back off
@@ -258,11 +309,6 @@ await page.evaluate(async () => { await window.__viewer.post.setAO(false); });
 // passes did. Worth the extra few lines per check to not repeat that.
 
 console.log('\nStyle effects');
-
-async function settle(ms = 500) {
-  await page.evaluate(() => window.__viewer.loop.invalidate(3));
-  await page.waitForTimeout(ms);
-}
 
 await page.evaluate(async () => { await window.__viewer.post.setCrt(true); });
 await settle();
