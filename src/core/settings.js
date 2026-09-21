@@ -87,6 +87,17 @@ const FIELDS = [
   { id: 'asciiCellSize', kind: 'range' },
   { id: 'asciiColorize', kind: 'checkbox' },
   { id: 'asciiInvert', kind: 'checkbox' },
+  { id: 'halftoneToggle', kind: 'checkbox' },
+  { id: 'halftoneMode', kind: 'select' },
+  { id: 'halftoneScale', kind: 'range' },
+  { id: 'halftoneAngle', kind: 'range' },
+  { id: 'halftoneInvert', kind: 'checkbox' },
+  { id: 'filmToggle', kind: 'checkbox' },
+  { id: 'filmPreset', kind: 'select' },
+  { id: 'filmGrain', kind: 'range' },
+  { id: 'filmDust', kind: 'range' },
+  { id: 'filmWeave', kind: 'range' },
+  { id: 'filmBurn', kind: 'range' },
 ];
 
 function readField({ id, kind }) {

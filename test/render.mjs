@@ -356,6 +356,52 @@ await settle();
 check('ASCII custom ramp changes the rendered image', (await viewportHash()) !== asciiBlocks);
 await page.evaluate(async () => { await window.__viewer.post.setAscii(false); });
 
+// Print reproduction (Dot matrix / CMYK / LinoCut) and film emulation - the
+// two families deferred as "bigger asks" back in Track 4's catalog
+// evaluation, built once the cheap batch had proven the pass architecture.
+
+await page.evaluate(async () => { await window.__viewer.post.setHalftone(true); });
+await settle();
+const halftoneDots = await viewportHash();
+check('Halftone changes the rendered image', halftoneDots !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setHalftoneMode('cmyk'));
+await settle();
+const halftoneCmyk = await viewportHash();
+check('CMYK separation differs from dot matrix', halftoneCmyk !== halftoneDots);
+
+await page.evaluate(() => window.__viewer.post.setHalftoneMode('linocut'));
+await settle();
+check('LinoCut differs from CMYK', (await viewportHash()) !== halftoneCmyk);
+await page.evaluate(async () => { await window.__viewer.post.setHalftone(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setFilm(true); });
+await settle();
+const filmSuper8 = await viewportHash();
+check('Film changes the rendered image', filmSuper8 !== baseline);
+
+// Deliberately NOT a pixel comparison: the film pass animates its grain from
+// uTime, so two captures differ frame-to-frame whether or not the preset
+// changed anything - a hash check here would pass even if setFilmPreset()
+// were a no-op. Driving the real <select> and asserting the sliders followed
+// tests the thing that actually has to work, deterministically.
+const filmPresetSwap = await page.evaluate(() => {
+  const select = document.getElementById('filmPreset');
+  const before = document.getElementById('filmGrain').value;
+  select.value = 'trashed';
+  select.dispatchEvent(new Event('change'));
+  const after = document.getElementById('filmGrain').value;
+  select.value = 'super8';
+  select.dispatchEvent(new Event('change'));
+  return { before, after, restored: document.getElementById('filmGrain').value };
+});
+check(
+  'film stock swap rewrites the film sliders',
+  filmPresetSwap.after !== filmPresetSwap.before && filmPresetSwap.restored === filmPresetSwap.before,
+  `grain ${filmPresetSwap.before} -> ${filmPresetSwap.after} -> ${filmPresetSwap.restored}`,
+);
+await page.evaluate(async () => { await window.__viewer.post.setFilm(false); });
+
 await settle();
 check('cycling every Style effect off restores the original image exactly', (await viewportHash()) === baseline);
 
@@ -387,7 +433,7 @@ await settle();
 const defaultOrderHash = await viewportHash();
 await page.evaluate(() => {
   const post = window.__viewer.post;
-  post.setStyleOrder(['glitch', 'crt', 'bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'ascii']);
+  post.setStyleOrder(['glitch', 'crt', 'bloom', 'colorGrade', 'tone', 'palette', 'halftone', 'repeat', 'displace', 'afterimage', 'ascii', 'film']);
 });
 await settle();
 check(
@@ -397,7 +443,7 @@ check(
 );
 await page.evaluate(async () => {
   const post = window.__viewer.post;
-  post.setStyleOrder(['bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'glitch']);
+  post.setStyleOrder(['bloom', 'colorGrade', 'tone', 'palette', 'halftone', 'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'film', 'glitch']);
   await post.setCrt(false);
   await post.setBloom(false);
 });

@@ -85,6 +85,12 @@ export const ASCII_RAMPS = {
   matrix: ' .,-~:;=!*#$@ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘ',
 };
 
+// Bounded on purpose. The four presets would cache four textures and stop,
+// but the custom-ramp field commits a new string on every 'change' - typing
+// through a dozen variations would otherwise bake and keep a dozen GPU
+// textures for the rest of the session, none of them reachable again once
+// the ramp moved on. Small leak, but an unbounded one.
+const MAX_CACHED_ATLASES = 8;
 const atlasCache = new Map();
 
 /**
@@ -124,6 +130,14 @@ function buildFontAtlas(ramp, cellPixels = 48) {
   // about three's default upload flip on top of it.
   texture.flipY = false;
   texture.needsUpdate = true;
+
+  // Evict oldest-first (Map preserves insertion order), disposing the GPU
+  // texture as it goes - dropping the reference alone would not free it.
+  while (atlasCache.size >= MAX_CACHED_ATLASES) {
+    const oldestKey = atlasCache.keys().next().value;
+    atlasCache.get(oldestKey)?.dispose();
+    atlasCache.delete(oldestKey);
+  }
 
   atlasCache.set(ramp, texture);
   return texture;

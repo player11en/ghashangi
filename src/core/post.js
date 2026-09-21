@@ -61,6 +61,8 @@ import { createColorGradeShader, setColorGradeStyle } from './passes/color-grade
 import { createToneShader, setToneMode } from './passes/tone-pass.js';
 import { createDisplaceShader, setDisplaceMode } from './passes/displace-pass.js';
 import { createAsciiShader, setAsciiRamp } from './passes/ascii-pass.js';
+import { createHalftoneShader, setHalftoneMode } from './passes/halftone-pass.js';
+import { createFilmShader, applyFilmPreset } from './passes/film-pass.js';
 
 /** Passes are imported on first enable, not at module load. */
 let modules = null;
@@ -102,7 +104,8 @@ async function loadModules() {
 // Bloom/CRT/Glitch kept their original relative slots as the default; the
 // five Track 5.3 additions land between Bloom and CRT, per the plan.
 const STYLE_KEYS = [
-  'bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'glitch',
+  'bloom', 'colorGrade', 'tone', 'palette', 'halftone', 'repeat', 'displace', 'afterimage', 'ascii',
+  'crt', 'film', 'glitch',
 ];
 
 /**
@@ -121,8 +124,9 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   // variable each, since reorderStyle() needs to address them generically.
   const passes = {};
   const styleEnabled = {
-    bloom: false, colorGrade: false, tone: false, palette: false,
-    repeat: false, displace: false, afterimage: false, ascii: false, crt: false, glitch: false,
+    bloom: false, colorGrade: false, tone: false, palette: false, halftone: false,
+    repeat: false, displace: false, afterimage: false, ascii: false,
+    crt: false, film: false, glitch: false,
   };
   let styleOrder = [...STYLE_KEYS];
 
@@ -145,6 +149,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let afterimageTrail = 0.9; // 0..1 UI value; mapped to damp in applyAfterimage()
   let asciiRampName = 'classic';
   let asciiCustomRamp = '';
+  let filmPreset = 'super8';
 
   // renderer.getSize() calls target.set(), so it needs a real Vector2 — a plain
   // {x, y} throws.
@@ -199,11 +204,13 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     passes.colorGrade = new ShaderPass(createColorGradeShader());
     passes.tone = new ShaderPass(createToneShader());
     passes.palette = new ShaderPass(createPaletteShader());
+    passes.halftone = new ShaderPass(createHalftoneShader());
     passes.repeat = new ShaderPass(createRepeatShader());
     passes.displace = new ShaderPass(createDisplaceShader());
     passes.afterimage = new AfterimagePass(); // real damp set by applyAfterimage() below
     passes.ascii = new ShaderPass(createAsciiShader());
     passes.crt = new ShaderPass(createCrtShader());
+    passes.film = new ShaderPass(createFilmShader());
     passes.glitch = new GlitchPass();
 
     for (const key of STYLE_KEYS) {
@@ -222,6 +229,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     applyPalette(passes.palette, paletteName);
     passes.palette.uniforms.pixelSize.value = pixelSize;
     setAsciiRamp(passes.ascii, asciiRampName, asciiCustomRamp);
+    applyFilmPreset(passes.film, filmPreset);
     applyAfterimage();
     composer.setSize(width, height);
     composer.setPixelRatio(renderer.getPixelRatio());
@@ -276,6 +284,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     if (passes.palette) passes.palette.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.tone) passes.tone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.ascii) passes.ascii.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.halftone) passes.halftone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.film) passes.film.uniforms.uResolution.value = [pixelWidth, pixelHeight];
   }
 
   function applyAfterimage() {
@@ -513,6 +523,37 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       invalidate(2);
     },
 
+    // --- print reproduction + film emulation -----------------------------
+
+    setHalftone(enabled) {
+      return setStyleEnabled('halftone', enabled);
+    },
+
+    setHalftoneMode(name) {
+      if (passes.halftone) setHalftoneMode(passes.halftone, name);
+      invalidate(2);
+    },
+
+    setHalftoneParam(name, value) {
+      if (passes.halftone?.uniforms[name]) passes.halftone.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    setFilm(enabled) {
+      return setStyleEnabled('film', enabled);
+    },
+
+    setFilmPreset(name) {
+      filmPreset = name;
+      if (passes.film) applyFilmPreset(passes.film, name);
+      invalidate(2);
+    },
+
+    setFilmParam(name, value) {
+      if (passes.film?.uniforms[name]) passes.film.uniforms[name].value = value;
+      invalidate(2);
+    },
+
     setSize(width, height) {
       if (!composer) return;
       composer.setSize(width, height);
@@ -537,6 +578,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       if (passes.crt) passes.crt.uniforms.uTime.value = t;
       if (passes.colorGrade) passes.colorGrade.uniforms.uTime.value = t;
       if (passes.displace) passes.displace.uniforms.uTime.value = t;
+      if (passes.film) passes.film.uniforms.uTime.value = t;
       if (active() && composer) composer.render();
       else renderer.render(scene, camera);
     },

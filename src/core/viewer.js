@@ -893,6 +893,8 @@ export function createViewer({ container }) {
         post.setDisplace(false);
         post.setAfterimage(false);
         post.setAscii(false);
+        post.setHalftone(false);
+        post.setFilm(false);
       }
     },
     setStageVisible(visible) {
@@ -931,6 +933,15 @@ export function createViewer({ container }) {
       clearModel();
       disposeObject(stageRoot.children[0] ?? null);
       environment.dispose();
+      // Was missing: the composer owns a read/write render-target pair, and
+      // every Style/fidelity pass owns more on top of that (Bloom's whole mip
+      // chain, GTAO's, SMAA's, Afterimage's accumulation buffer). None of it
+      // is reachable from renderer.dispose(), so tearing the viewer down
+      // without this leaked all of it. Latent rather than active today -
+      // nothing in this app disposes the viewer - but an incomplete teardown
+      // path is exactly the kind of thing that only bites once something
+      // (an embed, a test harness, HMR) finally does.
+      post?.dispose();
       controls.dispose();
       renderer.dispose();
       canvas.remove();

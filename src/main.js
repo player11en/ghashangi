@@ -31,7 +31,8 @@ import { createCameraPath } from './core/camera-path.js';
 import { createCameraPathPanel } from './ui/camera-path-panel.js';
 import { isClipRecordingSupported } from './core/recorder.js';
 import { createMaterialUndo } from './core/material-undo.js';
-import { logSessionStart, logExport, markStyleTouched } from './core/telemetry.js';
+import { FILM_PRESETS } from './core/passes/film-pass.js';
+import { logSessionStart, logExport, markStyleTouched, readTelemetry } from './core/telemetry.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -586,6 +587,8 @@ function syncStyleRows() {
     ['displaceToggle', '[data-displace]'],
     ['afterimageToggle', '[data-afterimage]'],
     ['asciiToggle', '[data-ascii]'],
+    ['halftoneToggle', '[data-halftone]'],
+    ['filmToggle', '[data-film]'],
   ]) {
     const on = $(flag).checked;
     for (const row of document.querySelectorAll(selector)) row.hidden = !on;
@@ -635,12 +638,14 @@ function checkStyleCost() {
 // extra work, matching every other control in this app.
 const STYLE_LABELS = {
   bloom: 'Bloom', colorGrade: 'Color grade', tone: 'Tone', palette: 'Retro palette',
-  repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails', ascii: 'ASCII', crt: 'CRT', glitch: 'Glitch',
+  halftone: 'Halftone / print', repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails',
+  ascii: 'ASCII', crt: 'CRT', film: 'Film', glitch: 'Glitch',
 };
 const STYLE_TOGGLE_IDS = {
   bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', tone: 'toneToggle', palette: 'paletteToggle',
-  repeat: 'repeatToggle', displace: 'displaceToggle', afterimage: 'afterimageToggle', ascii: 'asciiToggle',
-  crt: 'crtToggle', glitch: 'glitchToggle',
+  halftone: 'halftoneToggle', repeat: 'repeatToggle', displace: 'displaceToggle',
+  afterimage: 'afterimageToggle', ascii: 'asciiToggle', crt: 'crtToggle', film: 'filmToggle',
+  glitch: 'glitchToggle',
 };
 
 function renderStyleOrder() {
@@ -881,6 +886,74 @@ bindCheckbox('afterimageToggle', async (on) => {
 });
 bindSlider('afterimageTrail', (v) => viewer.post.setAfterimageTrail(v), fixed2);
 
+/**
+ * Pull the film sliders back in line with a preset's values. Dispatching
+ * 'input' rather than setting .value alone is deliberate: that re-runs
+ * bindSlider()'s own handler, which is what keeps each row's <output> text
+ * correct - the same reason settings.js restores controls by dispatching
+ * events instead of writing viewer state directly.
+ */
+function syncFilmSliders(presetName) {
+  const preset = FILM_PRESETS[presetName];
+  if (!preset) return;
+  for (const [uniform, id] of [
+    ['grain', 'filmGrain'], ['dust', 'filmDust'], ['weave', 'filmWeave'], ['burn', 'filmBurn'],
+  ]) {
+    const slider = $(id);
+    if (!slider) continue;
+    slider.value = String(preset[uniform]);
+    slider.dispatchEvent(new Event('input'));
+  }
+}
+
+bindCheckbox('halftoneToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setHalftone(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] halftone failed to initialise', error);
+    toasts.error('Could not enable halftone', String(error.message));
+    $('halftoneToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('halftoneMode').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setHalftoneMode(event.target.value);
+});
+bindSlider('halftoneScale', (v) => viewer.post.setHalftoneParam('scale', v), (v) => `${v}px`);
+bindSlider('halftoneAngle', (v) => viewer.post.setHalftoneParam('angle', (v * Math.PI) / 180), (v) => `${v}°`);
+bindCheckbox('halftoneInvert', (on) => viewer.post.setHalftoneParam('invert', on ? 1 : 0));
+
+bindCheckbox('filmToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setFilm(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] film effect failed to initialise', error);
+    toasts.error('Could not enable film', String(error.message));
+    $('filmToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('filmPreset').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setFilmPreset(event.target.value);
+  // A preset rewrites every film uniform, so the sliders showing those
+  // uniforms have to follow or they would report the previous stock's values.
+  syncFilmSliders(event.target.value);
+});
+bindSlider('filmGrain', (v) => viewer.post.setFilmParam('grain', v), fixed2);
+bindSlider('filmDust', (v) => viewer.post.setFilmParam('dust', v), fixed2);
+bindSlider('filmWeave', (v) => viewer.post.setFilmParam('weave', v), fixed2);
+bindSlider('filmBurn', (v) => viewer.post.setFilmParam('burn', v), fixed2);
+
 bindCheckbox('asciiToggle', async (on) => {
   markStyleTouched();
   syncStyleRows();
@@ -929,6 +1002,8 @@ function applyQualityTier(tier) {
     $('displaceToggle').checked = false;
     $('afterimageToggle').checked = false;
     $('asciiToggle').checked = false;
+    $('halftoneToggle').checked = false;
+    $('filmToggle').checked = false;
     syncPostRows();
     syncStyleRows();
   }
@@ -1126,6 +1201,11 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   window.__viewer = viewer;
   window.__materials = materialsPanel;
   window.__materialUndo = materialUndo;
+  // telemetry.js exists to answer three questions "in a few weeks" - but it
+  // was write-only in practice until this: reading it back meant hand-
+  // importing the module in devtools. window.__telemetry() is the actual
+  // queryable surface its own file header promised.
+  window.__telemetry = readTelemetry;
   window.__cameraPath = cameraPath;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;

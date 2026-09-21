@@ -20,8 +20,6 @@
 // on an otherwise-static view doesn't quietly force continuous rendering -
 // the same "an effect must not itself demand 60fps" rule AO/AA follow.
 
-export const CRT_TEXTURE_ID = 'tDiffuse';
-
 const crtVertexShader = `
 varying vec2 vUv;
 void main(){
