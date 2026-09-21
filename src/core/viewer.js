@@ -106,7 +106,17 @@ export function createViewer({ container }) {
   // Start at the tier's own default rather than always 1 -> applyQualityTier():
   // avoids a low-end device briefly constructing at full resolution and a
   // 2048 shadow map before main.js's startup call downscales it.
-  let resolutionScale = capability.tier === 'low' ? 0.75 : 1;
+  //
+  // 'medium' getting a mild reduction (not just 'low') was added after a
+  // real device exposed the gap: a touchscreen laptop with a genuine but
+  // modest discrete GPU (an NVIDIA Max-Q part, not an integrated chip -
+  // confirmed via chrome://gpu, ruling out the usual "browser picked the
+  // wrong GPU" cause) lands in 'medium' under the touch heuristic, and at
+  // a 2x-scaled display MAX_PIXEL_RATIO's cap of 2 still means every Style
+  // pass runs at native 2x pixel density with zero default headroom.
+  // 'medium' previously got exactly the same resolutionScale as 'high' -
+  // this is the actual, previously-missing distinction between them.
+  let resolutionScale = capability.tier === 'low' ? 0.75 : capability.tier === 'medium' ? 0.85 : 1;
 
   function applySize() {
     const width = container.clientWidth || window.innerWidth;
@@ -851,7 +861,7 @@ export function createViewer({ container }) {
      * @param {'low'|'medium'|'high'} tier
      */
     applyQualityTier(tier) {
-      resolutionScale = tier === 'low' ? 0.75 : 1;
+      resolutionScale = tier === 'low' ? 0.75 : tier === 'medium' ? 0.85 : 1;
       applySize();
       lights.setShadowMapSize(tier === 'low' ? 1024 : 2048);
       if (tier === 'low') {
