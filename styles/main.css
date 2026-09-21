@@ -459,6 +459,24 @@ input[type='checkbox'] {
 .hint[data-level='error'] { color: var(--danger); }
 .hint[data-level='warn'] { color: var(--warn); }
 
+.panel-footer {
+  margin: 4px 0 0;
+  padding: 12px 0 4px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.panel-footer a {
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.panel-footer a:hover,
+.panel-footer a:focus-visible {
+  color: var(--text);
+}
+
 /* --- url loader --------------------------------------------------------- */
 
 .url-form { margin-top: 12px; }

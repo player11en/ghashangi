@@ -296,8 +296,17 @@ not geometry, were the thing to compress.
   Only ~340 KB is ever fetched at runtime, so this costs deploy size, not user
   bandwidth.
 
+## Contributing
+
+Bug reports and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for
+setup, the test suite, and what kind of changes fit this project's scope.
+
 ## Credits
 
 Built on [three.js](https://threejs.org) r186. Test models from the
 [glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets)
 repository.
+
+## License
+
+[MIT](LICENSE).

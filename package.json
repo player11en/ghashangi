@@ -4,6 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Browser 3D model studio — load a model from disk, a URL or a Google Drive link; fix its orientation, recolour its materials, light it, style it, and export one image per colourway or a recorded camera move.",
+  "license": "MIT",
+  "author": "Zina",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<your-github-username>/Ghashangi.git"
+  },
   "scripts": {
     "dev": "vite",
     "dev:https": "vite --host --mode https",
