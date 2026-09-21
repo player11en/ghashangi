@@ -569,13 +569,20 @@ function syncStyleRows() {
     ['repeatToggle', '[data-repeat]'],
     ['displaceToggle', '[data-displace]'],
     ['afterimageToggle', '[data-afterimage]'],
+    ['asciiToggle', '[data-ascii]'],
   ]) {
     const on = $(flag).checked;
     for (const row of document.querySelectorAll(selector)) row.hidden = !on;
   }
   syncColorGradeSubrows();
   syncToneSubrows();
+  syncAsciiSubrows();
   renderStyleOrder();
+}
+
+function syncAsciiSubrows() {
+  const isCustom = $('asciiToggle').checked && $('asciiRamp').value === 'custom';
+  for (const row of document.querySelectorAll('[data-ascii-custom]')) row.hidden = !isCustom;
 }
 
 function syncColorGradeSubrows() {
@@ -612,11 +619,12 @@ function checkStyleCost() {
 // extra work, matching every other control in this app.
 const STYLE_LABELS = {
   bloom: 'Bloom', colorGrade: 'Color grade', tone: 'Tone', palette: 'Retro palette',
-  repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails', crt: 'CRT', glitch: 'Glitch',
+  repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails', ascii: 'ASCII', crt: 'CRT', glitch: 'Glitch',
 };
 const STYLE_TOGGLE_IDS = {
   bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', tone: 'toneToggle', palette: 'paletteToggle',
-  repeat: 'repeatToggle', displace: 'displaceToggle', afterimage: 'afterimageToggle', crt: 'crtToggle', glitch: 'glitchToggle',
+  repeat: 'repeatToggle', displace: 'displaceToggle', afterimage: 'afterimageToggle', ascii: 'asciiToggle',
+  crt: 'crtToggle', glitch: 'glitchToggle',
 };
 
 function renderStyleOrder() {
@@ -857,6 +865,32 @@ bindCheckbox('afterimageToggle', async (on) => {
 });
 bindSlider('afterimageTrail', (v) => viewer.post.setAfterimageTrail(v), fixed2);
 
+bindCheckbox('asciiToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setAscii(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] ASCII failed to initialise', error);
+    toasts.error('Could not enable ASCII', String(error.message));
+    $('asciiToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('asciiRamp').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setAsciiRamp(event.target.value, $('asciiCustomRamp').value);
+  syncAsciiSubrows();
+});
+$('asciiCustomRamp').addEventListener('change', (event) => {
+  if ($('asciiRamp').value === 'custom') viewer.post.setAsciiRamp('custom', event.target.value);
+});
+bindSlider('asciiCellSize', (v) => viewer.post.setAsciiParam('cellSize', v), (v) => `${v}px`);
+bindCheckbox('asciiColorize', (on) => viewer.post.setAsciiParam('colorize', on ? 1 : 0));
+bindCheckbox('asciiInvert', (on) => viewer.post.setAsciiParam('invert', on ? 1 : 0));
+
 syncStyleRows();
 
 // Quality tier: resolution scale and shadow map size always; AO/AA/Style are
@@ -878,6 +912,7 @@ function applyQualityTier(tier) {
     $('repeatToggle').checked = false;
     $('displaceToggle').checked = false;
     $('afterimageToggle').checked = false;
+    $('asciiToggle').checked = false;
     syncPostRows();
     syncStyleRows();
   }
@@ -1006,12 +1041,55 @@ function refreshStats() {
       : 'under budget';
 }
 
+// Track 5.1 follow-up: a real measured-performance nudge, not just the
+// guessed effect-count one below it. "3+ effects" says nothing about
+// whether a *specific* device can actually afford even one - a laptop
+// with hybrid graphics can struggle if the browser happens to be
+// rendering on its integrated GPU rather than a discrete one it has
+// (checkable in chrome://gpu, outside this app's control either way).
+//
+// Auto-*applying* a downgrade here was tried and reverted: measured
+// directly, under headless testing a burst of ordinary invalidate cycles
+// with AO on was enough to trigger it, silently unchecking the user's own
+// AO toggle and corrupting whatever the test was actually checking - the
+// exact same failure mode a real user would hit during any legitimate
+// temporary slowdown (a heavy shadow recompute, a big model's first
+// frame), having Style effects they explicitly turned on switched off
+// without asking. That breaks the one rule every tier-aware control in
+// this app has followed since Track 1.5: an explicit user choice stands
+// until the user changes it. A measured frame rate being bad is real
+// evidence something is slow - it is not evidence the user wants their
+// settings changed for them. So: same shape as checkStyleCost() below,
+// informational only.
+let sustainedLowFrames = 0;
+let performanceCostWarned = false;
+const LOW_FPS_THRESHOLD = 20;
+const SUSTAINED_TICKS_NEEDED = 6; // 6 * 500ms = 3s of genuinely bad performance
+
+function checkMeasuredPerformance(fps) {
+  if (performanceCostWarned) return;
+  const tier = $('qualityTier').value;
+  if (!viewer.post.active || tier === 'low' || fps <= 0) {
+    sustainedLowFrames = 0;
+    return;
+  }
+  sustainedLowFrames = fps < LOW_FPS_THRESHOLD ? sustainedLowFrames + 1 : 0;
+  if (sustainedLowFrames < SUSTAINED_TICKS_NEEDED) return;
+
+  performanceCostWarned = true;
+  toasts.warn(
+    `Rendering has stayed under ${LOW_FPS_THRESHOLD}fps for a few seconds`,
+    'Try Quality: Low in Environment, or turn off a Style effect.',
+  );
+}
+
 // FPS is the only stat that needs polling; the rest change on load. 2Hz is
 // enough to read and costs nothing.
 setInterval(() => {
   const { fps } = viewer.loop.stats;
   $('statFps').textContent = fps > 0 ? fps.toFixed(0) : '—';
   refreshStats();
+  checkMeasuredPerformance(fps);
 
   // Track 5.1: the same FPS number, shown inside the Style section itself
   // rather than only in the separate Stats section - so cause (a Style

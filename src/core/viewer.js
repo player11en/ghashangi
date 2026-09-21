@@ -872,6 +872,7 @@ export function createViewer({ container }) {
         post.setRepeat(false);
         post.setDisplace(false);
         post.setAfterimage(false);
+        post.setAscii(false);
       }
     },
     setStageVisible(visible) {

@@ -81,6 +81,12 @@ const FIELDS = [
   { id: 'displaceAngle', kind: 'range' },
   { id: 'afterimageToggle', kind: 'checkbox' },
   { id: 'afterimageTrail', kind: 'range' },
+  { id: 'asciiToggle', kind: 'checkbox' },
+  { id: 'asciiRamp', kind: 'select' },
+  { id: 'asciiCustomRamp', kind: 'text' },
+  { id: 'asciiCellSize', kind: 'range' },
+  { id: 'asciiColorize', kind: 'checkbox' },
+  { id: 'asciiInvert', kind: 'checkbox' },
 ];
 
 function readField({ id, kind }) {
@@ -100,7 +106,10 @@ function writeField({ id, kind }, value) {
     if (el.checked !== Boolean(value)) el.click();
   } else {
     el.value = value;
-    el.dispatchEvent(new Event(kind === 'select' ? 'change' : 'input'));
+    // 'select' and 'text' fields are wired to 'change' (commit-on-blur,
+    // matching the hex/custom-ramp text inputs elsewhere in this app);
+    // everything else ('range', 'color') is wired to 'input' for live feedback.
+    el.dispatchEvent(new Event(kind === 'select' || kind === 'text' ? 'change' : 'input'));
   }
 }
 

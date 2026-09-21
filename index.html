@@ -551,6 +551,38 @@
           <output for="afterimageTrail" id="afterimageTrailOut">0.55</output>
         </div>
 
+        <div class="row row-check">
+          <input type="checkbox" id="asciiToggle">
+          <label for="asciiToggle">ASCII</label>
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiRamp">Character set</label>
+          <select id="asciiRamp">
+            <option value="classic" selected>Classic</option>
+            <option value="blocks">Blocks</option>
+            <option value="binary">Binary</option>
+            <option value="matrix">Matrix</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="row" data-ascii-custom>
+          <label for="asciiCustomRamp">Custom chars</label>
+          <input type="text" id="asciiCustomRamp" placeholder=" .:-=+*#%@" maxlength="32">
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiCellSize">Cell size</label>
+          <input type="range" id="asciiCellSize" min="4" max="32" step="1" value="12">
+          <output for="asciiCellSize" id="asciiCellSizeOut">12px</output>
+        </div>
+        <div class="row row-check" data-ascii>
+          <input type="checkbox" id="asciiColorize">
+          <label for="asciiColorize">Colorize</label>
+        </div>
+        <div class="row row-check" data-ascii>
+          <input type="checkbox" id="asciiInvert">
+          <label for="asciiInvert">Invert (print style)</label>
+        </div>
+
         <div class="row" id="styleOrderRow">
           <label id="styleOrderLabel">Effect chain order</label>
         </div>

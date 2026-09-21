@@ -60,6 +60,7 @@ import { createRepeatShader, setRepeatMode } from './passes/repeat-pass.js';
 import { createColorGradeShader, setColorGradeStyle } from './passes/color-grade-pass.js';
 import { createToneShader, setToneMode } from './passes/tone-pass.js';
 import { createDisplaceShader, setDisplaceMode } from './passes/displace-pass.js';
+import { createAsciiShader, setAsciiRamp } from './passes/ascii-pass.js';
 
 /** Passes are imported on first enable, not at module load. */
 let modules = null;
@@ -100,7 +101,9 @@ async function loadModules() {
 // fresh composer builds passes in; reorderStyle() below permutes it later.
 // Bloom/CRT/Glitch kept their original relative slots as the default; the
 // five Track 5.3 additions land between Bloom and CRT, per the plan.
-const STYLE_KEYS = ['bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'crt', 'glitch'];
+const STYLE_KEYS = [
+  'bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'glitch',
+];
 
 /**
  * @param {object} options
@@ -119,7 +122,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   const passes = {};
   const styleEnabled = {
     bloom: false, colorGrade: false, tone: false, palette: false,
-    repeat: false, displace: false, afterimage: false, crt: false, glitch: false,
+    repeat: false, displace: false, afterimage: false, ascii: false, crt: false, glitch: false,
   };
   let styleOrder = [...STYLE_KEYS];
 
@@ -140,6 +143,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let paletteName = 'gba';
   let pixelSize = 4;
   let afterimageTrail = 0.9; // 0..1 UI value; mapped to damp in applyAfterimage()
+  let asciiRampName = 'classic';
+  let asciiCustomRamp = '';
 
   // renderer.getSize() calls target.set(), so it needs a real Vector2 — a plain
   // {x, y} throws.
@@ -197,6 +202,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     passes.repeat = new ShaderPass(createRepeatShader());
     passes.displace = new ShaderPass(createDisplaceShader());
     passes.afterimage = new AfterimagePass(); // real damp set by applyAfterimage() below
+    passes.ascii = new ShaderPass(createAsciiShader());
     passes.crt = new ShaderPass(createCrtShader());
     passes.glitch = new GlitchPass();
 
@@ -215,6 +221,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     applyCrtPreset(passes.crt, crtPreset);
     applyPalette(passes.palette, paletteName);
     passes.palette.uniforms.pixelSize.value = pixelSize;
+    setAsciiRamp(passes.ascii, asciiRampName, asciiCustomRamp);
     applyAfterimage();
     composer.setSize(width, height);
     composer.setPixelRatio(renderer.getPixelRatio());
@@ -260,7 +267,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     });
   }
 
-  /** CRT, Palette, and Tone all need the real pixel resolution for their grids. */
+  /** CRT, Palette, Tone, and ASCII all need the real pixel resolution for their grids. */
   function applyResolutionUniforms(width, height) {
     const ratio = renderer.getPixelRatio();
     const pixelWidth = width * ratio;
@@ -268,6 +275,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     if (passes.crt) passes.crt.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.palette) passes.palette.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.tone) passes.tone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.ascii) passes.ascii.uniforms.uResolution.value = [pixelWidth, pixelHeight];
   }
 
   function applyAfterimage() {
@@ -484,6 +492,24 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     setAfterimageTrail(value) {
       afterimageTrail = value;
       applyAfterimage();
+      invalidate(2);
+    },
+
+    // --- Track 4.5 (ASCII), built after being deferred through Tracks 4/5 --
+
+    setAscii(enabled) {
+      return setStyleEnabled('ascii', enabled);
+    },
+
+    setAsciiRamp(name, customRamp) {
+      asciiRampName = name;
+      if (customRamp !== undefined) asciiCustomRamp = customRamp;
+      if (passes.ascii) setAsciiRamp(passes.ascii, name, asciiCustomRamp);
+      invalidate(2);
+    },
+
+    setAsciiParam(name, value) {
+      if (passes.ascii?.uniforms[name]) passes.ascii.uniforms[name].value = value;
       invalidate(2);
     },
 

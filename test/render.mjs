@@ -337,6 +337,25 @@ await settle();
 check('Afterimage/trails changes the rendered image', (await viewportHash()) !== baseline);
 await page.evaluate(async () => { await window.__viewer.post.setAfterimage(false); });
 
+// Track 4.5: ASCII, built after being deferred through Tracks 4 and 5
+// specifically because the DOM-table approach (three's own AsciiEffect,
+// and the separate reference project that adapted it) can't survive
+// EffectComposer or canvas.captureStream() - this is a real ShaderPass
+// instead, so it gets the same fallback/toggle checks every other pass
+// here does, not a different verification story.
+await page.evaluate(async () => { await window.__viewer.post.setAscii(true); });
+await settle();
+const asciiOn = await viewportHash();
+check('ASCII changes the rendered image', asciiOn !== baseline);
+await page.evaluate(() => window.__viewer.post.setAsciiRamp('blocks'));
+await settle();
+const asciiBlocks = await viewportHash();
+check('ASCII character set swap changes the rendered image', asciiBlocks !== asciiOn);
+await page.evaluate(() => window.__viewer.post.setAsciiRamp('custom', ' .oO@'));
+await settle();
+check('ASCII custom ramp changes the rendered image', (await viewportHash()) !== asciiBlocks);
+await page.evaluate(async () => { await window.__viewer.post.setAscii(false); });
+
 await settle();
 check('cycling every Style effect off restores the original image exactly', (await viewportHash()) === baseline);
 
@@ -368,7 +387,7 @@ await settle();
 const defaultOrderHash = await viewportHash();
 await page.evaluate(() => {
   const post = window.__viewer.post;
-  post.setStyleOrder(['glitch', 'crt', 'bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage']);
+  post.setStyleOrder(['glitch', 'crt', 'bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'ascii']);
 });
 await settle();
 check(
@@ -378,7 +397,7 @@ check(
 );
 await page.evaluate(async () => {
   const post = window.__viewer.post;
-  post.setStyleOrder(['bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'crt', 'glitch']);
+  post.setStyleOrder(['bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'glitch']);
   await post.setCrt(false);
   await post.setBloom(false);
 });
