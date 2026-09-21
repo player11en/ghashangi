@@ -354,6 +354,10 @@
       <section class="group">
         <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="styleBody">Style</button></h2>
         <div class="group-body" id="styleBody" hidden>
+        <div class="row" id="styleFpsRow" hidden>
+          <label>Style FPS</label>
+          <output id="styleFpsOut">—</output>
+        </div>
         <div class="row row-check">
           <input type="checkbox" id="crtToggle">
           <label for="crtToggle">CRT</label>
@@ -400,6 +404,158 @@
           <input type="range" id="pixelSize" min="1" max="16" step="1" value="4">
           <output for="pixelSize" id="pixelSizeOut">4px</output>
         </div>
+
+        <div class="row row-check">
+          <input type="checkbox" id="colorGradeToggle">
+          <label for="colorGradeToggle">Color grade</label>
+        </div>
+        <div class="row" data-colorgrade>
+          <label for="colorGradeStyle">Style</label>
+          <select id="colorGradeStyle">
+            <option value="none" selected>None (correction only)</option>
+            <option value="duotone">Duotone</option>
+            <option value="huecycle">Hue cycle</option>
+            <option value="rainbow">Rainbow</option>
+          </select>
+        </div>
+        <div class="row" data-colorgrade>
+          <label for="cgBrightness">Brightness</label>
+          <input type="range" id="cgBrightness" min="0" max="2" step="0.05" value="1">
+          <output for="cgBrightness" id="cgBrightnessOut">1.00</output>
+        </div>
+        <div class="row" data-colorgrade>
+          <label for="cgContrast">Contrast</label>
+          <input type="range" id="cgContrast" min="0" max="2" step="0.05" value="1">
+          <output for="cgContrast" id="cgContrastOut">1.00</output>
+        </div>
+        <div class="row" data-colorgrade>
+          <label for="cgSaturation">Saturation</label>
+          <input type="range" id="cgSaturation" min="0" max="2" step="0.05" value="1">
+          <output for="cgSaturation" id="cgSaturationOut">1.00</output>
+        </div>
+        <div class="row" data-colorgrade>
+          <label for="cgHue">Hue offset</label>
+          <input type="range" id="cgHue" min="0" max="1" step="0.01" value="0">
+          <output for="cgHue" id="cgHueOut">0°</output>
+        </div>
+        <div class="row" data-colorgrade>
+          <label for="cgSpeed">Cycle speed</label>
+          <input type="range" id="cgSpeed" min="0" max="3" step="0.05" value="1">
+          <output for="cgSpeed" id="cgSpeedOut">1.00</output>
+        </div>
+        <div class="row" data-colorgrade-duotone>
+          <label for="cgLightColor">Light color</label>
+          <input type="color" id="cgLightColor" value="#ffe699">
+        </div>
+        <div class="row" data-colorgrade-duotone>
+          <label for="cgDarkColor">Dark color</label>
+          <input type="color" id="cgDarkColor" value="#0d0d33">
+        </div>
+
+        <div class="row row-check">
+          <input type="checkbox" id="toneToggle">
+          <label for="toneToggle">Tone</label>
+        </div>
+        <div class="row" data-tone>
+          <label for="toneMode">Mode</label>
+          <select id="toneMode">
+            <option value="posterize" selected>Posterize</option>
+            <option value="solarize">Solarize</option>
+            <option value="edges">Edges</option>
+          </select>
+        </div>
+        <div class="row" data-tone-posterize>
+          <label for="toneLevels">Levels</label>
+          <input type="range" id="toneLevels" min="2" max="16" step="1" value="4">
+          <output for="toneLevels" id="toneLevelsOut">4</output>
+        </div>
+        <div class="row" data-tone-solarize>
+          <label for="toneThreshold">Threshold</label>
+          <input type="range" id="toneThreshold" min="0" max="1" step="0.01" value="0.5">
+          <output for="toneThreshold" id="toneThresholdOut">0.50</output>
+        </div>
+        <div class="row" data-tone-edges>
+          <label for="tonePassthru">Passthru</label>
+          <input type="range" id="tonePassthru" min="0" max="1" step="0.01" value="0">
+          <output for="tonePassthru" id="tonePassthruOut">0.00</output>
+        </div>
+        <div class="row" data-tone-edges>
+          <label for="toneEdgeColor">Edge color</label>
+          <input type="color" id="toneEdgeColor" value="#ffffff">
+        </div>
+
+        <div class="row row-check">
+          <input type="checkbox" id="repeatToggle">
+          <label for="repeatToggle">Repeat</label>
+        </div>
+        <div class="row" data-repeat>
+          <label for="repeatMode">Mode</label>
+          <select id="repeatMode">
+            <option value="mirror" selected>Mirror</option>
+            <option value="kaleido">Kaleido</option>
+            <option value="tile">Tile</option>
+          </select>
+        </div>
+        <div class="row" data-repeat>
+          <label for="repeatAmount">Amount</label>
+          <input type="range" id="repeatAmount" min="2" max="16" step="1" value="6">
+          <output for="repeatAmount" id="repeatAmountOut">6</output>
+        </div>
+        <div class="row" data-repeat>
+          <label for="repeatAngle">Angle</label>
+          <input type="range" id="repeatAngle" min="0" max="360" step="1" value="0">
+          <output for="repeatAngle" id="repeatAngleOut">0°</output>
+        </div>
+
+        <div class="row row-check">
+          <input type="checkbox" id="displaceToggle">
+          <label for="displaceToggle">Glitch displace</label>
+        </div>
+        <div class="row" data-displace>
+          <label for="displaceMode">Mode</label>
+          <select id="displaceMode">
+            <option value="wave" selected>Wave</option>
+            <option value="wobble">Wobble</option>
+            <option value="jitter">Jitter</option>
+            <option value="shake">Shake</option>
+          </select>
+        </div>
+        <div class="row" data-displace>
+          <label for="displaceAmount">Amount</label>
+          <input type="range" id="displaceAmount" min="0" max="5" step="0.1" value="1">
+          <output for="displaceAmount" id="displaceAmountOut">1.0</output>
+        </div>
+        <div class="row" data-displace>
+          <label for="displaceSize">Size</label>
+          <input type="range" id="displaceSize" min="0.1" max="5" step="0.1" value="1">
+          <output for="displaceSize" id="displaceSizeOut">1.0</output>
+        </div>
+        <div class="row" data-displace>
+          <label for="displaceSpeed">Speed</label>
+          <input type="range" id="displaceSpeed" min="0" max="5" step="0.1" value="1">
+          <output for="displaceSpeed" id="displaceSpeedOut">1.0</output>
+        </div>
+        <div class="row" data-displace>
+          <label for="displaceAngle">Angle</label>
+          <input type="range" id="displaceAngle" min="0" max="360" step="1" value="0">
+          <output for="displaceAngle" id="displaceAngleOut">0°</output>
+        </div>
+
+        <div class="row row-check">
+          <input type="checkbox" id="afterimageToggle">
+          <label for="afterimageToggle">Trails</label>
+        </div>
+        <div class="row" data-afterimage>
+          <label for="afterimageTrail">Trail length</label>
+          <input type="range" id="afterimageTrail" min="0" max="1" step="0.01" value="0.55">
+          <output for="afterimageTrail" id="afterimageTrailOut">0.55</output>
+        </div>
+
+        <div class="row" id="styleOrderRow">
+          <label id="styleOrderLabel">Effect chain order</label>
+        </div>
+        <ol id="styleOrderList" class="style-order-list" aria-labelledby="styleOrderLabel"></ol>
+
         <p class="hint" id="styleHint">
           Renders through the same post-processing pipeline as ambient
           occlusion above, and shows up in every screenshot and recorded clip.

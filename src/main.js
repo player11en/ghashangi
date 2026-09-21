@@ -59,7 +59,7 @@ const accordion = createAccordion($('panelBody'), $('rail'));
 
 createShortcuts();
 
-const settings = createSettings({ accordion, orientation: viewer.orientation });
+const settings = createSettings({ accordion, orientation: viewer.orientation, post: viewer.post });
 
 // Registers its own viewer callback, so it rebuilds itself on every load.
 const animationPanel = createAnimationPanel({ viewer, onRebuild: accordion.syncRailVisibility });
@@ -412,6 +412,12 @@ function bindCheckbox(id, apply) {
 const fixed2 = (v) => v.toFixed(2);
 const fixed1 = (v) => v.toFixed(1);
 
+/** '#rrggbb' -> [r,g,b] in 0..1, the shape every color-grade/tone shader uniform expects. */
+function hexToRgbArray(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
 // Model
 bindSlider('scaleSlider', (v) => viewer.setScale(v), (v) => `${v.toFixed(2)}×`);
 bindSlider('heightSlider', (v) => viewer.setHeight(v), fixed1);
@@ -558,10 +564,109 @@ function syncStyleRows() {
     ['bloomToggle', '[data-bloom]'],
     ['glitchToggle', '[data-glitch]'],
     ['paletteToggle', '[data-palette]'],
+    ['colorGradeToggle', '[data-colorgrade]'],
+    ['toneToggle', '[data-tone]'],
+    ['repeatToggle', '[data-repeat]'],
+    ['displaceToggle', '[data-displace]'],
+    ['afterimageToggle', '[data-afterimage]'],
   ]) {
     const on = $(flag).checked;
     for (const row of document.querySelectorAll(selector)) row.hidden = !on;
   }
+  syncColorGradeSubrows();
+  syncToneSubrows();
+  renderStyleOrder();
+}
+
+function syncColorGradeSubrows() {
+  const isDuotone = $('colorGradeToggle').checked && $('colorGradeStyle').value === 'duotone';
+  for (const row of document.querySelectorAll('[data-colorgrade-duotone]')) row.hidden = !isDuotone;
+}
+
+function syncToneSubrows() {
+  const on = $('toneToggle').checked;
+  const mode = $('toneMode').value;
+  for (const row of document.querySelectorAll('[data-tone-posterize]')) row.hidden = !(on && mode === 'posterize');
+  for (const row of document.querySelectorAll('[data-tone-solarize]')) row.hidden = !(on && mode === 'solarize');
+  for (const row of document.querySelectorAll('[data-tone-edges]')) row.hidden = !(on && mode === 'edges');
+}
+
+// Track 5.1: a one-time nudge, not a silent auto-disable - stacking Style
+// effects is a real, visible cost the person doing it should know about,
+// but their choice to keep them all on stands, same as every other control.
+let styleCostWarned = false;
+function checkStyleCost() {
+  if (styleCostWarned) return;
+  const tier = $('qualityTier').value;
+  if (tier !== 'high' && viewer.post.styleEffectCount >= 3) {
+    styleCostWarned = true;
+    toasts.warn(
+      'Multiple Style effects together may be slow on this device',
+      "Try Quality: Low in Environment, or turn one of them off.",
+    );
+  }
+}
+
+// Track 5.2: composite order as a small ordered list with up/down buttons,
+// not drag-and-drop - keeps this keyboard/screen-reader accessible without
+// extra work, matching every other control in this app.
+const STYLE_LABELS = {
+  bloom: 'Bloom', colorGrade: 'Color grade', tone: 'Tone', palette: 'Retro palette',
+  repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails', crt: 'CRT', glitch: 'Glitch',
+};
+const STYLE_TOGGLE_IDS = {
+  bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', tone: 'toneToggle', palette: 'paletteToggle',
+  repeat: 'repeatToggle', displace: 'displaceToggle', afterimage: 'afterimageToggle', crt: 'crtToggle', glitch: 'glitchToggle',
+};
+
+function renderStyleOrder() {
+  const list = $('styleOrderList');
+  const order = viewer.post.styleOrder;
+  list.replaceChildren();
+
+  order.forEach((key, index) => {
+    const item = document.createElement('li');
+    item.className = 'style-order-item';
+    const enabled = $(STYLE_TOGGLE_IDS[key]).checked;
+    item.dataset.enabled = String(enabled);
+
+    const name = document.createElement('span');
+    name.className = 'style-order-name';
+    name.textContent = STYLE_LABELS[key] ?? key;
+    item.appendChild(name);
+
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'nudge';
+    up.textContent = '▲';
+    up.disabled = index === 0;
+    up.setAttribute('aria-label', `Move ${STYLE_LABELS[key]} earlier in the chain`);
+    up.addEventListener('click', () => {
+      const next = [...order];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      viewer.post.setStyleOrder(next);
+      renderStyleOrder();
+      settings.save();
+    });
+    item.appendChild(up);
+
+    const down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'nudge';
+    down.textContent = '▼';
+    down.disabled = index === order.length - 1;
+    down.setAttribute('aria-label', `Move ${STYLE_LABELS[key]} later in the chain`);
+    down.addEventListener('click', () => {
+      const next = [...order];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      viewer.post.setStyleOrder(next);
+      renderStyleOrder();
+      settings.save();
+    });
+    item.appendChild(down);
+
+    list.appendChild(item);
+  });
 }
 
 bindCheckbox('crtToggle', async (on) => {
@@ -569,6 +674,8 @@ bindCheckbox('crtToggle', async (on) => {
   syncStyleRows();
   try {
     await viewer.post.setCrt(on);
+    checkStyleCost();
+    syncStyleRows();
   } catch (error) {
     console.error('[3DMViewer] CRT effect failed to initialise', error);
     toasts.error('Could not enable CRT', String(error.message));
@@ -586,6 +693,8 @@ bindCheckbox('bloomToggle', async (on) => {
   syncStyleRows();
   try {
     await viewer.post.setBloom(on);
+    checkStyleCost();
+    syncStyleRows();
   } catch (error) {
     console.error('[3DMViewer] bloom failed to initialise', error);
     toasts.error('Could not enable bloom', String(error.message));
@@ -600,6 +709,8 @@ bindCheckbox('glitchToggle', async (on) => {
   syncStyleRows();
   try {
     await viewer.post.setGlitch(on);
+    checkStyleCost();
+    syncStyleRows();
   } catch (error) {
     console.error('[3DMViewer] glitch failed to initialise', error);
     toasts.error('Could not enable glitch', String(error.message));
@@ -614,6 +725,8 @@ bindCheckbox('paletteToggle', async (on) => {
   syncStyleRows();
   try {
     await viewer.post.setPalette(on);
+    checkStyleCost();
+    syncStyleRows();
   } catch (error) {
     console.error('[3DMViewer] retro palette failed to initialise', error);
     toasts.error('Could not enable the retro palette', String(error.message));
@@ -626,6 +739,124 @@ $('paletteName').addEventListener('change', (event) => {
   viewer.post.setPaletteName(event.target.value);
 });
 bindSlider('pixelSize', (v) => viewer.post.setPixelSize(v), (v) => `${v}px`);
+
+bindCheckbox('colorGradeToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setColorGrade(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] color grade failed to initialise', error);
+    toasts.error('Could not enable color grade', String(error.message));
+    $('colorGradeToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('colorGradeStyle').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setColorGradeStyle(event.target.value);
+  syncColorGradeSubrows();
+});
+bindSlider('cgBrightness', (v) => viewer.post.setColorGradeParam('brightness', v), fixed2);
+bindSlider('cgContrast', (v) => viewer.post.setColorGradeParam('contrast', v), fixed2);
+bindSlider('cgSaturation', (v) => viewer.post.setColorGradeParam('saturation', v), fixed2);
+bindSlider('cgHue', (v) => viewer.post.setColorGradeParam('hueOffset', v), (v) => `${Math.round(v * 360)}°`);
+bindSlider('cgSpeed', (v) => viewer.post.setColorGradeParam('speed', v), fixed2);
+$('cgLightColor').addEventListener('input', (event) => {
+  viewer.post.setColorGradeParam('lightColor', hexToRgbArray(event.target.value));
+});
+$('cgDarkColor').addEventListener('input', (event) => {
+  viewer.post.setColorGradeParam('darkColor', hexToRgbArray(event.target.value));
+});
+
+bindCheckbox('toneToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setTone(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] tone effect failed to initialise', error);
+    toasts.error('Could not enable tone', String(error.message));
+    $('toneToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('toneMode').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setToneMode(event.target.value);
+  syncToneSubrows();
+});
+bindSlider('toneLevels', (v) => viewer.post.setToneParam('levels', v), (v) => String(v));
+bindSlider('toneThreshold', (v) => viewer.post.setToneParam('solarizeThreshold', v), fixed2);
+bindSlider('tonePassthru', (v) => viewer.post.setToneParam('passthru', v), fixed2);
+$('toneEdgeColor').addEventListener('input', (event) => {
+  viewer.post.setToneParam('edgeColor', hexToRgbArray(event.target.value));
+});
+
+bindCheckbox('repeatToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setRepeat(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] repeat effect failed to initialise', error);
+    toasts.error('Could not enable repeat', String(error.message));
+    $('repeatToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('repeatMode').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setRepeatMode(event.target.value);
+});
+bindSlider('repeatAmount', (v) => viewer.post.setRepeatAmount(v), (v) => String(v));
+bindSlider('repeatAngle', (v) => viewer.post.setRepeatAngle(v), (v) => `${v}°`);
+
+bindCheckbox('displaceToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setDisplace(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] displace effect failed to initialise', error);
+    toasts.error('Could not enable glitch displace', String(error.message));
+    $('displaceToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('displaceMode').addEventListener('change', (event) => {
+  markStyleTouched();
+  viewer.post.setDisplaceMode(event.target.value);
+});
+bindSlider('displaceAmount', (v) => viewer.post.setDisplaceParam('amount', v), fixed1);
+bindSlider('displaceSize', (v) => viewer.post.setDisplaceParam('size', v), fixed1);
+bindSlider('displaceSpeed', (v) => viewer.post.setDisplaceParam('speed', v), fixed1);
+bindSlider('displaceAngle', (v) => viewer.post.setDisplaceParam('angle', (v * Math.PI) / 180), (v) => `${v}°`);
+
+bindCheckbox('afterimageToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setAfterimage(on);
+    checkStyleCost();
+    syncStyleRows();
+  } catch (error) {
+    console.error('[3DMViewer] trails failed to initialise', error);
+    toasts.error('Could not enable trails', String(error.message));
+    $('afterimageToggle').checked = false;
+    syncStyleRows();
+  }
+});
+bindSlider('afterimageTrail', (v) => viewer.post.setAfterimageTrail(v), fixed2);
+
 syncStyleRows();
 
 // Quality tier: resolution scale and shadow map size always; AO/AA/Style are
@@ -642,6 +873,11 @@ function applyQualityTier(tier) {
     $('bloomToggle').checked = false;
     $('glitchToggle').checked = false;
     $('paletteToggle').checked = false;
+    $('colorGradeToggle').checked = false;
+    $('toneToggle').checked = false;
+    $('repeatToggle').checked = false;
+    $('displaceToggle').checked = false;
+    $('afterimageToggle').checked = false;
     syncPostRows();
     syncStyleRows();
   }
@@ -776,6 +1012,15 @@ setInterval(() => {
   const { fps } = viewer.loop.stats;
   $('statFps').textContent = fps > 0 ? fps.toFixed(0) : '—';
   refreshStats();
+
+  // Track 5.1: the same FPS number, shown inside the Style section itself
+  // rather than only in the separate Stats section - so cause (a Style
+  // toggle) and effect (the frame rate) are visible in the same place,
+  // instead of "I turned on Glitch" and "the number over in Stats" reading
+  // as two unconnected facts.
+  const styleActive = viewer.post.styleEffectCount > 0;
+  $('styleFpsRow').hidden = !styleActive;
+  if (styleActive) $('styleFpsOut').textContent = fps > 0 ? fps.toFixed(0) : '—';
 }, 500);
 
 // --- debug surface -------------------------------------------------------

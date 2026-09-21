@@ -867,6 +867,11 @@ export function createViewer({ container }) {
         post.setGlitch(false);
         post.setCrt(false);
         post.setPalette(false);
+        post.setColorGrade(false);
+        post.setTone(false);
+        post.setRepeat(false);
+        post.setDisplace(false);
+        post.setAfterimage(false);
       }
     },
     setStageVisible(visible) {

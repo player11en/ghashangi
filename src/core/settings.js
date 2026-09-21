@@ -54,6 +54,33 @@ const FIELDS = [
   { id: 'pixelSize', kind: 'range' },
   { id: 'cpDuration', kind: 'range' },
   { id: 'cpAspect', kind: 'select' },
+  { id: 'colorGradeToggle', kind: 'checkbox' },
+  { id: 'colorGradeStyle', kind: 'select' },
+  { id: 'cgBrightness', kind: 'range' },
+  { id: 'cgContrast', kind: 'range' },
+  { id: 'cgSaturation', kind: 'range' },
+  { id: 'cgHue', kind: 'range' },
+  { id: 'cgSpeed', kind: 'range' },
+  { id: 'cgLightColor', kind: 'color' },
+  { id: 'cgDarkColor', kind: 'color' },
+  { id: 'toneToggle', kind: 'checkbox' },
+  { id: 'toneMode', kind: 'select' },
+  { id: 'toneLevels', kind: 'range' },
+  { id: 'toneThreshold', kind: 'range' },
+  { id: 'tonePassthru', kind: 'range' },
+  { id: 'toneEdgeColor', kind: 'color' },
+  { id: 'repeatToggle', kind: 'checkbox' },
+  { id: 'repeatMode', kind: 'select' },
+  { id: 'repeatAmount', kind: 'range' },
+  { id: 'repeatAngle', kind: 'range' },
+  { id: 'displaceToggle', kind: 'checkbox' },
+  { id: 'displaceMode', kind: 'select' },
+  { id: 'displaceAmount', kind: 'range' },
+  { id: 'displaceSize', kind: 'range' },
+  { id: 'displaceSpeed', kind: 'range' },
+  { id: 'displaceAngle', kind: 'range' },
+  { id: 'afterimageToggle', kind: 'checkbox' },
+  { id: 'afterimageTrail', kind: 'range' },
 ];
 
 function readField({ id, kind }) {
@@ -83,12 +110,16 @@ function writeField({ id, kind }, value) {
  *   which sections were left open.
  * @param {object} options.orientation From viewer.orientation — for restoring
  *   the up-axis preset only (see the file header for why not the fine angles).
+ * @param {object} options.post        From viewer.post — for restoring the
+ *   Style effect chain's composite order (Track 5.2). Not a FIELDS entry:
+ *   it's a permutation of effect keys, not a single DOM element's value.
  */
-export function createSettings({ accordion, orientation }) {
+export function createSettings({ accordion, orientation, post }) {
   function save() {
     const data = {
       fields: Object.fromEntries(FIELDS.map((f) => [f.id, readField(f)])),
       upAxis: orientation.preset,
+      styleOrder: post.styleOrder,
       sections: Object.fromEntries(
         accordion.sectionIds().map((id) => [id, accordion.isSectionOpen(id)]),
       ),
@@ -121,6 +152,10 @@ export function createSettings({ accordion, orientation }) {
     // preset — nothing meaningful to reapply to a different model.
     if (data.upAxis && data.upAxis !== 'custom') {
       orientation.setUpAxis(data.upAxis);
+    }
+
+    if (Array.isArray(data.styleOrder)) {
+      post.setStyleOrder(data.styleOrder);
     }
 
     for (const [id, open] of Object.entries(data.sections ?? {})) {

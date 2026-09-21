@@ -294,8 +294,94 @@ await settle();
 check('Palette swap changes the rendered image', (await viewportHash()) !== paletteOn);
 await page.evaluate(async () => { await window.__viewer.post.setPalette(false); });
 
+// --- Track 5.3: the cheap effect batch ------------------------------------
+
+await page.evaluate(async () => { await window.__viewer.post.setRepeat(true); });
+await settle();
+const repeatOn = await viewportHash();
+check('Repeat changes the rendered image', repeatOn !== baseline);
+await page.evaluate(() => window.__viewer.post.setRepeatMode('kaleido'));
+await settle();
+check('Repeat mode swap changes the rendered image', (await viewportHash()) !== repeatOn);
+await page.evaluate(async () => { await window.__viewer.post.setRepeat(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setColorGrade(true); });
+await settle();
+const colorGradeOn = await viewportHash();
+check('Color grade changes the rendered image', colorGradeOn !== baseline);
+await page.evaluate(() => window.__viewer.post.setColorGradeStyle('duotone'));
+await settle();
+check('Color grade style swap changes the rendered image', (await viewportHash()) !== colorGradeOn);
+await page.evaluate(async () => { await window.__viewer.post.setColorGrade(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setTone(true); });
+await settle();
+const toneOn = await viewportHash();
+check('Tone changes the rendered image', toneOn !== baseline);
+await page.evaluate(() => window.__viewer.post.setToneMode('edges'));
+await settle();
+check('Tone mode swap changes the rendered image', (await viewportHash()) !== toneOn);
+await page.evaluate(async () => { await window.__viewer.post.setTone(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setDisplace(true); });
+await settle();
+const displaceOn = await viewportHash();
+check('Displace changes the rendered image', displaceOn !== baseline);
+await page.evaluate(() => window.__viewer.post.setDisplaceMode('wobble'));
+await settle();
+check('Displace mode swap changes the rendered image', (await viewportHash()) !== displaceOn);
+await page.evaluate(async () => { await window.__viewer.post.setDisplace(false); });
+
+await page.evaluate(async () => { await window.__viewer.post.setAfterimage(true); });
+await settle();
+check('Afterimage/trails changes the rendered image', (await viewportHash()) !== baseline);
+await page.evaluate(async () => { await window.__viewer.post.setAfterimage(false); });
+
 await settle();
 check('cycling every Style effect off restores the original image exactly', (await viewportHash()) === baseline);
+
+// --- Track 5.2: reorderable Style chain -----------------------------------
+
+const reorder = await page.evaluate(() => {
+  const post = window.__viewer.post;
+  const original = post.styleOrder;
+  const swapped = [...original];
+  [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+  post.setStyleOrder(swapped);
+  const applied = post.styleOrder;
+  post.setStyleOrder(original); // restore, so later checks see the default order
+  return { original, swapped, applied };
+});
+check(
+  'setStyleOrder() actually permutes the composite order',
+  JSON.stringify(reorder.applied) === JSON.stringify(reorder.swapped) &&
+    JSON.stringify(reorder.applied) !== JSON.stringify(reorder.original),
+  `${reorder.original[0]},${reorder.original[1]} -> ${reorder.applied[0]},${reorder.applied[1]}`,
+);
+
+await page.evaluate(async () => {
+  const v = window.__viewer;
+  await v.post.setCrt(true);
+  await v.post.setBloom(true);
+});
+await settle();
+const defaultOrderHash = await viewportHash();
+await page.evaluate(() => {
+  const post = window.__viewer.post;
+  post.setStyleOrder(['glitch', 'crt', 'bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage']);
+});
+await settle();
+check(
+  'reordering CRT/Bloom actually changes the composited image',
+  (await viewportHash()) !== defaultOrderHash,
+  'CRT-before-Bloom vs Bloom-before-CRT should composite differently',
+);
+await page.evaluate(async () => {
+  const post = window.__viewer.post;
+  post.setStyleOrder(['bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'crt', 'glitch']);
+  await post.setCrt(false);
+  await post.setBloom(false);
+});
 
 const idleWithCrt = await page.evaluate(async () => {
   const v = window.__viewer;

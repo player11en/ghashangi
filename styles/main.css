@@ -362,6 +362,41 @@ body {
 .button + .button { margin-top: 8px; }
 .row-buttons .button + .button { margin-top: 0; }
 
+/* --- style effect chain (Track 5.2) -------------------------------------- */
+
+.style-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.style-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.style-order-item[data-enabled='false'] {
+  color: var(--text-dim);
+}
+
+.style-order-name {
+  flex: 1;
+}
+
+.style-order-item .nudge {
+  padding: 2px 7px;
+}
+
 .button[disabled],
 input[disabled],
 select[disabled] {

@@ -56,6 +56,10 @@
 import { Vector2 } from 'three';
 import { createCrtShader, applyCrtPreset } from './passes/crt-pass.js';
 import { createPaletteShader, applyPalette } from './passes/palette-pass.js';
+import { createRepeatShader, setRepeatMode } from './passes/repeat-pass.js';
+import { createColorGradeShader, setColorGradeStyle } from './passes/color-grade-pass.js';
+import { createToneShader, setToneMode } from './passes/tone-pass.js';
+import { createDisplaceShader, setDisplaceMode } from './passes/displace-pass.js';
 
 /** Passes are imported on first enable, not at module load. */
 let modules = null;
@@ -71,6 +75,7 @@ async function loadModules() {
     { ShaderPass },
     { UnrealBloomPass },
     { GlitchPass },
+    { AfterimagePass },
   ] = await Promise.all([
     import('three/addons/postprocessing/EffectComposer.js'),
     import('three/addons/postprocessing/RenderPass.js'),
@@ -80,10 +85,22 @@ async function loadModules() {
     import('three/addons/postprocessing/ShaderPass.js'),
     import('three/addons/postprocessing/UnrealBloomPass.js'),
     import('three/addons/postprocessing/GlitchPass.js'),
+    import('three/addons/postprocessing/AfterimagePass.js'),
   ]);
-  modules = { EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass };
+  modules = {
+    EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
+    AfterimagePass,
+  };
   return modules;
 }
+
+// Every Style-tier effect (i.e. everything except AO/AA, which are fidelity,
+// not stylization, and stay outside the reorderable band - see Track 4's own
+// "Style vs Environment" split). Order here is only the *default* order a
+// fresh composer builds passes in; reorderStyle() below permutes it later.
+// Bloom/CRT/Glitch kept their original relative slots as the default; the
+// five Track 5.3 additions land between Bloom and CRT, per the plan.
+const STYLE_KEYS = ['bloom', 'colorGrade', 'tone', 'palette', 'repeat', 'displace', 'afterimage', 'crt', 'glitch'];
 
 /**
  * @param {object} options
@@ -96,17 +113,18 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let composer = null;
   let gtaoPass = null;
   let smaaPass = null;
-  let bloomPass = null;
-  let glitchPass = null;
-  let crtPass = null;
-  let palettePass = null;
+
+  // Every Style pass, keyed the same as STYLE_KEYS - one map rather than one
+  // variable each, since reorderStyle() needs to address them generically.
+  const passes = {};
+  const styleEnabled = {
+    bloom: false, colorGrade: false, tone: false, palette: false,
+    repeat: false, displace: false, afterimage: false, crt: false, glitch: false,
+  };
+  let styleOrder = [...STYLE_KEYS];
 
   let aoEnabled = false;
   let aaEnabled = false;
-  let bloomEnabled = false;
-  let glitchEnabled = false;
-  let crtEnabled = false;
-  let paletteEnabled = false;
 
   let aoIntensity = 1;
   // Fraction of the subject's radius. A fixed world-space radius would be
@@ -121,6 +139,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let crtPreset = 'arcade';
   let paletteName = 'gba';
   let pixelSize = 4;
+  let afterimageTrail = 0.9; // 0..1 UI value; mapped to damp in applyAfterimage()
 
   // renderer.getSize() calls target.set(), so it needs a real Vector2 — a plain
   // {x, y} throws.
@@ -133,12 +152,18 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   /** True when any effect wants the composer. */
   function active() {
-    return aoEnabled || aaEnabled || bloomEnabled || glitchEnabled || crtEnabled || paletteEnabled;
+    return aoEnabled || aaEnabled || Object.values(styleEnabled).some(Boolean);
+  }
+
+  /** How many Style (non-fidelity) effects are currently on - see setSize's caller in Track 5.1. */
+  function styleEffectCount() {
+    return Object.values(styleEnabled).filter(Boolean).length;
   }
 
   async function build(width, height) {
     const {
       EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
+      AfterimagePass,
     } = await loadModules();
     if (composer) return;
 
@@ -153,48 +178,72 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     smaaPass.enabled = aaEnabled;
     composer.addPass(smaaPass);
 
-    // Composite order below is pinned deliberately, not incidental:
+    // Default composite order below (STYLE_KEYS) is a starting point, not a
+    // hard rule - reorderStyle() permutes it later. The reasoning that
+    // motivated this particular default is still worth recording:
     //
-    //   Bloom -> Palette (pixelate+dither+quantize) -> CRT -> Glitch
+    // Bloom before Palette: bloom-after-palette would let glow bleed between
+    // fixed-palette colors before the final quantize, which reads as "a
+    // filter over a retro image" rather than "a GBA screenshot" - bloom-
+    // first still gets every pixel snapped to the palette on its way out.
     //
-    // Bloom before palette, not after: bloom-after-palette would let glow
-    // bleed between fixed-palette colors before the final quantize, which
-    // reads as "a modern filter over a retro image." Bloom-before still gets
-    // every bloomed pixel snapped to the palette on its way out - the
-    // fixed-palette guarantee holds either way, but only bloom-first gives
-    // the "GBA screenshot" look this is for.
-    //
-    // Glitch after CRT, not before: reads as the CRT signal itself breaking
-    // up (a struggling TV) rather than a corrupted source feed underneath a
+    // Glitch after CRT: reads as the CRT signal itself breaking up (a
+    // struggling TV) rather than a corrupted source feed underneath a
     // working CRT - the more common real-world reference.
-    bloomPass = new UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
-    bloomPass.enabled = bloomEnabled;
-    composer.addPass(bloomPass);
+    passes.bloom = new UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
+    passes.colorGrade = new ShaderPass(createColorGradeShader());
+    passes.tone = new ShaderPass(createToneShader());
+    passes.palette = new ShaderPass(createPaletteShader());
+    passes.repeat = new ShaderPass(createRepeatShader());
+    passes.displace = new ShaderPass(createDisplaceShader());
+    passes.afterimage = new AfterimagePass(); // real damp set by applyAfterimage() below
+    passes.crt = new ShaderPass(createCrtShader());
+    passes.glitch = new GlitchPass();
 
-    palettePass = new ShaderPass(createPaletteShader());
-    palettePass.enabled = paletteEnabled;
-    composer.addPass(palettePass);
-
-    crtPass = new ShaderPass(createCrtShader());
-    crtPass.enabled = crtEnabled;
-    composer.addPass(crtPass);
-
-    glitchPass = new GlitchPass();
-    glitchPass.enabled = glitchEnabled;
-    composer.addPass(glitchPass);
+    for (const key of STYLE_KEYS) {
+      passes[key].enabled = styleEnabled[key];
+      composer.addPass(passes[key]);
+    }
 
     // Must be last: it performs tone mapping and the sRGB conversion that the
     // renderer would otherwise do on its own. Reads renderer.toneMapping
     // itself, unmodified by anything above it — see the file header.
-    composer.addPass(new OutputPass());
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
 
     applyAO();
-    applyCrtPreset(crtPass, crtPreset);
-    applyPalette(palettePass, paletteName);
-    palettePass.uniforms.pixelSize.value = pixelSize;
+    applyCrtPreset(passes.crt, crtPreset);
+    applyPalette(passes.palette, paletteName);
+    passes.palette.uniforms.pixelSize.value = pixelSize;
+    applyAfterimage();
     composer.setSize(width, height);
     composer.setPixelRatio(renderer.getPixelRatio());
     applyResolutionUniforms(width, height);
+  }
+
+  /**
+   * Permute the Style band's composite order (Track 5.2). Bloom/GTAO/SMAA's
+   * fixed prefix and OutputPass's fixed suffix never move - only the Style
+   * passes between them do, since EffectComposer.passes is a plain array and
+   * every Style pass is already in it (added once, in build(), and simply
+   * re-spliced here rather than removed/recreated).
+   *
+   * @param {string[]} order  A permutation of STYLE_KEYS. Missing/unknown
+   *   keys are tolerated - appended at the end, or ignored, respectively -
+   *   since this is fed from persisted settings that could predate a
+   *   newly-added effect.
+   */
+  function reorderStyle(order) {
+    const filtered = order.filter((k) => STYLE_KEYS.includes(k));
+    for (const k of STYLE_KEYS) if (!filtered.includes(k)) filtered.push(k);
+    styleOrder = filtered;
+
+    if (!composer) return;
+    const styleInstances = new Set(STYLE_KEYS.map((k) => passes[k]));
+    const insertAt = composer.passes.indexOf(smaaPass) + 1;
+    composer.passes = composer.passes.filter((p) => !styleInstances.has(p));
+    composer.passes.splice(insertAt, 0, ...styleOrder.map((k) => passes[k]));
+    invalidate(2);
   }
 
   function applyAO() {
@@ -211,19 +260,53 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     });
   }
 
-  /** CRT and palette both need the real pixel resolution for their grids. */
+  /** CRT, Palette, and Tone all need the real pixel resolution for their grids. */
   function applyResolutionUniforms(width, height) {
     const ratio = renderer.getPixelRatio();
     const pixelWidth = width * ratio;
     const pixelHeight = height * ratio;
-    if (crtPass) crtPass.uniforms.uResolution.value = [pixelWidth, pixelHeight];
-    if (palettePass) palettePass.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.crt) passes.crt.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.palette) passes.palette.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.tone) passes.tone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+  }
+
+  function applyAfterimage() {
+    if (!passes.afterimage) return;
+    // UI works in an intuitive 0..1 "trail length"; damp itself is a narrow
+    // band close to 1 (0 or 1 either do nothing or accumulate forever).
+    passes.afterimage.uniforms.damp.value = 0.8 + afterimageTrail * 0.18;
+  }
+
+  /** Generic enable/build path every Style effect setter below shares. */
+  async function setStyleEnabled(key, enabled) {
+    styleEnabled[key] = enabled;
+    if (enabled && !composer) {
+      const size = currentSize();
+      await build(size.x, size.y);
+    }
+    if (passes[key]) passes[key].enabled = enabled;
+    invalidate(2);
   }
 
   return {
     /** Whether the composer is currently in the output path. */
     get active() {
       return active();
+    },
+
+    /** Count of currently-enabled Style effects - see Track 5.1's device-cost nudge. */
+    get styleEffectCount() {
+      return styleEffectCount();
+    },
+
+    /** Current Style composite order, for persisting/restoring (Track 5.2). */
+    get styleOrder() {
+      return [...styleOrder];
+    },
+
+    /** Permute the Style composite order. See reorderStyle()'s own doc comment. */
+    setStyleOrder(order) {
+      reorderStyle(order);
     },
 
     async setAO(enabled) {
@@ -269,89 +352,138 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       applyAO();
     },
 
-    // --- Style effects (Track 4.3/4.4) --------------------------------------
-    // Same shape as setAO/setAA above throughout: lazy-build the composer on
-    // first enable, keep local state so a later build() (or a tier default)
-    // can re-apply it, invalidate(2) so a shadow-adjacent redraw settles.
+    // --- Style effects (Track 4.3/4.4, extended in Track 5.3) ---------------
+    // Same shape throughout: lazy-build the composer on first enable, keep
+    // local state so a later build() (or a tier default) can re-apply it,
+    // invalidate(2) so a shadow-adjacent redraw settles.
 
-    async setBloom(enabled) {
-      bloomEnabled = enabled;
-      if (enabled && !composer) {
-        const size = currentSize();
-        await build(size.x, size.y);
-      }
-      if (bloomPass) bloomPass.enabled = enabled;
-      invalidate(2);
+    setBloom(enabled) {
+      return setStyleEnabled('bloom', enabled);
     },
 
     setBloomStrength(value) {
       bloomStrength = value;
-      if (bloomPass) bloomPass.strength = value;
+      if (passes.bloom) passes.bloom.strength = value;
       invalidate(2);
     },
 
     setBloomRadius(value) {
       bloomRadius = value;
-      if (bloomPass) bloomPass.radius = value;
+      if (passes.bloom) passes.bloom.radius = value;
       invalidate(2);
     },
 
     setBloomThreshold(value) {
       bloomThreshold = value;
-      if (bloomPass) bloomPass.threshold = value;
+      if (passes.bloom) passes.bloom.threshold = value;
       invalidate(2);
     },
 
-    async setGlitch(enabled) {
-      glitchEnabled = enabled;
-      if (enabled && !composer) {
-        const size = currentSize();
-        await build(size.x, size.y);
-      }
-      if (glitchPass) glitchPass.enabled = enabled;
-      invalidate(2);
+    setGlitch(enabled) {
+      return setStyleEnabled('glitch', enabled);
     },
 
     setGlitchWild(wild) {
-      if (glitchPass) glitchPass.goWild = wild;
+      if (passes.glitch) passes.glitch.goWild = wild;
       invalidate(2);
     },
 
-    async setCrt(enabled) {
-      crtEnabled = enabled;
-      if (enabled && !composer) {
-        const size = currentSize();
-        await build(size.x, size.y);
-      }
-      if (crtPass) crtPass.enabled = enabled;
-      invalidate(2);
+    setCrt(enabled) {
+      return setStyleEnabled('crt', enabled);
     },
 
     setCrtPreset(name) {
       crtPreset = name;
-      if (crtPass) applyCrtPreset(crtPass, name);
+      if (passes.crt) applyCrtPreset(passes.crt, name);
       invalidate(2);
     },
 
-    async setPalette(enabled) {
-      paletteEnabled = enabled;
-      if (enabled && !composer) {
-        const size = currentSize();
-        await build(size.x, size.y);
-      }
-      if (palettePass) palettePass.enabled = enabled;
-      invalidate(2);
+    setPalette(enabled) {
+      return setStyleEnabled('palette', enabled);
     },
 
     setPaletteName(name) {
       paletteName = name;
-      if (palettePass) applyPalette(palettePass, name);
+      if (passes.palette) applyPalette(passes.palette, name);
       invalidate(2);
     },
 
     setPixelSize(value) {
       pixelSize = value;
-      if (palettePass) palettePass.uniforms.pixelSize.value = value;
+      if (passes.palette) passes.palette.uniforms.pixelSize.value = value;
+      invalidate(2);
+    },
+
+    // --- Track 5.3 additions -------------------------------------------
+
+    setRepeat(enabled) {
+      return setStyleEnabled('repeat', enabled);
+    },
+
+    setRepeatMode(name) {
+      if (passes.repeat) setRepeatMode(passes.repeat, name);
+      invalidate(2);
+    },
+
+    setRepeatAmount(value) {
+      if (passes.repeat) passes.repeat.uniforms.amount.value = value;
+      invalidate(2);
+    },
+
+    setRepeatAngle(degrees) {
+      if (passes.repeat) passes.repeat.uniforms.angle.value = (degrees * Math.PI) / 180;
+      invalidate(2);
+    },
+
+    setColorGrade(enabled) {
+      return setStyleEnabled('colorGrade', enabled);
+    },
+
+    setColorGradeStyle(name) {
+      if (passes.colorGrade) setColorGradeStyle(passes.colorGrade, name);
+      invalidate(2);
+    },
+
+    setColorGradeParam(name, value) {
+      if (passes.colorGrade?.uniforms[name]) passes.colorGrade.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    setTone(enabled) {
+      return setStyleEnabled('tone', enabled);
+    },
+
+    setToneMode(name) {
+      if (passes.tone) setToneMode(passes.tone, name);
+      invalidate(2);
+    },
+
+    setToneParam(name, value) {
+      if (passes.tone?.uniforms[name]) passes.tone.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    setDisplace(enabled) {
+      return setStyleEnabled('displace', enabled);
+    },
+
+    setDisplaceMode(name) {
+      if (passes.displace) setDisplaceMode(passes.displace, name);
+      invalidate(2);
+    },
+
+    setDisplaceParam(name, value) {
+      if (passes.displace?.uniforms[name]) passes.displace.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    setAfterimage(enabled) {
+      return setStyleEnabled('afterimage', enabled);
+    },
+
+    setAfterimageTrail(value) {
+      afterimageTrail = value;
+      applyAfterimage();
       invalidate(2);
     },
 
@@ -360,7 +492,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer.setSize(width, height);
       composer.setPixelRatio(renderer.getPixelRatio());
       gtaoPass?.setSize(width, height);
-      bloomPass?.setSize(width, height);
+      passes.bloom?.setSize(width, height);
       applyResolutionUniforms(width, height);
     },
 
@@ -368,13 +500,17 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
      * The render call handed to the loop and to captureScreenshot().
      *
      * Deliberately does not touch renderer.toneMapping — see the file header
-     * for why nothing here needs to. CRT's uTime is advanced here rather than
-     * from the render loop's own update(), since it only matters for the one
-     * frame actually about to be drawn — no reason to touch it when nothing
-     * is rendering.
+     * for why nothing here needs to. Time-based uniforms (CRT's grain/roll,
+     * ColorGrade's hue-cycle animation, Displace's wave/wobble/jitter/shake)
+     * are advanced here rather than from the render loop's own update(),
+     * since they only matter for the one frame actually about to be drawn —
+     * no reason to touch them when nothing is rendering.
      */
     render() {
-      if (crtPass) crtPass.uniforms.uTime.value = performance.now() / 1000;
+      const t = performance.now() / 1000;
+      if (passes.crt) passes.crt.uniforms.uTime.value = t;
+      if (passes.colorGrade) passes.colorGrade.uniforms.uTime.value = t;
+      if (passes.displace) passes.displace.uniforms.uTime.value = t;
       if (active() && composer) composer.render();
       else renderer.render(scene, camera);
     },
@@ -383,17 +519,13 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer?.dispose();
       gtaoPass?.dispose?.();
       smaaPass?.dispose?.();
-      bloomPass?.dispose?.();
-      glitchPass?.dispose?.();
-      crtPass?.dispose?.();
-      palettePass?.dispose?.();
+      for (const key of STYLE_KEYS) {
+        passes[key]?.dispose?.();
+        passes[key] = null;
+      }
       composer = null;
       gtaoPass = null;
       smaaPass = null;
-      bloomPass = null;
-      glitchPass = null;
-      crtPass = null;
-      palettePass = null;
     },
   };
 }
