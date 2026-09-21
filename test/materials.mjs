@@ -163,6 +163,79 @@ await page.waitForTimeout(250);
 const afterReset = await viewportHash();
 check('reset all restores the authored look exactly', afterReset === authored);
 
+// --- material undo/redo ---------------------------------------------------
+
+console.log('\nMaterial undo/redo');
+
+const undoFlow = await page.evaluate(async () => {
+  const v = window.__viewer;
+  const mu = window.__materialUndo;
+  const key = v.materials[0].key;
+
+  mu.reset(); // start this check from a clean history
+  const authoredColor = v.materials[0].material.color.getHexString();
+
+  v.setMaterialColor(key, '#ff0000', 1);
+  await new Promise((r) => setTimeout(r, 700)); // clear the 500ms coalesce debounce
+
+  const afterEdit = { color: v.materials[0].material.color.getHexString(), canUndo: mu.canUndo };
+  const undone = mu.undo();
+  const afterUndo = {
+    color: v.materials[0].material.color.getHexString(),
+    canUndo: mu.canUndo,
+    canRedo: mu.canRedo,
+  };
+  const redone = mu.redo();
+  const afterRedo = { color: v.materials[0].material.color.getHexString(), canRedo: mu.canRedo };
+
+  return { authoredColor, afterEdit, undone, afterUndo, redone, afterRedo };
+});
+
+check('an edit makes undo available', undoFlow.afterEdit.canUndo === true, `color -> #${undoFlow.afterEdit.color}`);
+check(
+  'undo restores the pre-edit color exactly',
+  undoFlow.undone && undoFlow.afterUndo.color === undoFlow.authoredColor,
+  `#${undoFlow.afterUndo.color}`,
+);
+check(
+  'undo leaves redo available and undo unavailable',
+  undoFlow.afterUndo.canRedo === true && undoFlow.afterUndo.canUndo === false,
+);
+check('redo re-applies the edit', undoFlow.redone && undoFlow.afterRedo.color === 'ff0000');
+check('redo empties the redo stack', undoFlow.afterRedo.canRedo === false);
+
+// Coalescing: a burst of rapid edits (dragging a slider) must collapse into
+// ONE undo step, not one per intermediate value - undoing once should land
+// all the way back at the pre-burst state, not one step into the burst.
+const coalesced = await page.evaluate(async () => {
+  const v = window.__viewer;
+  const mu = window.__materialUndo;
+  const key = v.materials[0].key;
+
+  mu.reset();
+  const before = v.materials[0].material.color.getHexString();
+
+  for (const hex of ['#111111', '#222222', '#333333', '#444444']) {
+    v.setMaterialColor(key, hex, 1);
+  }
+  await new Promise((r) => setTimeout(r, 700));
+
+  const afterBurst = v.materials[0].material.color.getHexString();
+  const undone = mu.undo();
+  const afterUndo = v.materials[0].material.color.getHexString();
+
+  return { before, afterBurst, afterUndo, undone, canUndoAfter: mu.canUndo };
+});
+
+check(
+  'a rapid burst of edits coalesces into one undo step',
+  coalesced.undone && coalesced.afterUndo === coalesced.before,
+  `${coalesced.before} -> ... -> ${coalesced.afterBurst} -> undo -> ${coalesced.afterUndo}`,
+);
+check('undoing a coalesced burst has nothing further to undo', coalesced.canUndoAfter === false);
+
+await page.evaluate(() => window.__viewer.resetAllMaterials());
+
 // --- multi-material model ------------------------------------------------
 
 console.log('\nDamagedHelmet (multi-material, textured)');

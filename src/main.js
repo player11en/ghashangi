@@ -30,6 +30,7 @@ import { recordTurntable, isTurntableSupported } from './core/turntable.js';
 import { createCameraPath } from './core/camera-path.js';
 import { createCameraPathPanel } from './ui/camera-path-panel.js';
 import { isClipRecordingSupported } from './core/recorder.js';
+import { createMaterialUndo } from './core/material-undo.js';
 import { logSessionStart, logExport, markStyleTouched } from './core/telemetry.js';
 
 const $ = (id) => document.getElementById(id);
@@ -49,6 +50,18 @@ viewer.start();
 logSessionStart();
 
 const materialsPanel = createMaterialsPanel({ viewer, toasts });
+
+const materialUndo = createMaterialUndo({ viewer });
+viewer.onMaterialChange(() => materialUndo.recordChange());
+
+function syncMaterialUndoButtons() {
+  $('materialUndo').disabled = !materialUndo.canUndo;
+  $('materialRedo').disabled = !materialUndo.canRedo;
+}
+materialUndo.onChange(syncMaterialUndoButtons);
+
+$('materialUndo').addEventListener('click', () => materialUndo.undo());
+$('materialRedo').addEventListener('click', () => materialUndo.redo());
 
 // Accordion built before animationPanel: #animationGroup's own `hidden`
 // (whether the model has clips at all) is independent of the accordion's
@@ -157,6 +170,9 @@ async function install(object, animations, fs, name = 'model') {
   syncOrientationUI();
   // Rebuild the material list and reattach this model's saved colourways.
   materialsPanel.refresh(name);
+  // A new model starts a fresh undo history - the previous one's material
+  // states describe materials that no longer exist.
+  materialUndo.reset();
 }
 
 /** Turn a loader failure into something a person can act on. */
@@ -1109,6 +1125,7 @@ setInterval(() => {
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   window.__viewer = viewer;
   window.__materials = materialsPanel;
+  window.__materialUndo = materialUndo;
   window.__cameraPath = cameraPath;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;

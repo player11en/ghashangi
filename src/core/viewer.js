@@ -199,6 +199,10 @@ export function createViewer({ container }) {
   let onAnimationChange = () => {};
   // Notified each frame while playing, so a scrubber can follow the playhead.
   let animationTick = () => {};
+  // Notified after every material-affecting change, for material-undo.js to
+  // record - see afterMaterialChange() below, the single chokepoint every
+  // material edit/reset/colourway-apply already goes through.
+  let onMaterialChange = () => {};
 
   const loop = createRenderLoop({
     renderer,
@@ -340,6 +344,7 @@ export function createViewer({ container }) {
     // through (manual edits, resets, colourway apply) - one place to log
     // "materials were touched this session" rather than one call per control.
     markMaterialsTouched();
+    onMaterialChange();
   }
 
   /** Apply the scale and height sliders on top of the baked normalisation. */
@@ -710,6 +715,11 @@ export function createViewer({ container }) {
     /** Called when the clip list changes — i.e. on every model load. */
     onAnimationChange(callback) {
       onAnimationChange = callback ?? (() => {});
+    },
+
+    /** Called after every material-affecting change. See material-undo.js. */
+    onMaterialChange(callback) {
+      onMaterialChange = callback ?? (() => {});
     },
 
     /** Called each frame while a clip is playing, so a scrubber can follow. */
