@@ -246,9 +246,39 @@ await page.waitForTimeout(400);
 
 await page.evaluate(async () => { await window.__viewer.post.setAO(false); });
 
-async function settle(ms = 500) {
-  await page.evaluate(() => window.__viewer.loop.invalidate(3));
-  await page.waitForTimeout(ms);
+/**
+ * Wait for the renderer to actually draw, rather than for a stopwatch.
+ *
+ * This used to be invalidate() plus a fixed sleep, and under a loaded machine
+ * that is a guess: if the frames have not been drawn yet when the screenshot is
+ * taken, a pixel-exact check compares against a stale image and fails. That is
+ * a worse failure than a crash, because a timing miss on "switching this off
+ * restores the original image exactly" is indistinguishable from a real
+ * regression - which is exactly what happened in a batch run where render
+ * reported two such failures that did not reproduce standalone.
+ *
+ * render-loop.js increments stats.rendered immediately after each render()
+ * call, so waiting for that counter to advance by the number of frames
+ * requested waits for the work itself. The timeout is a backstop for a genuine
+ * hang, not the mechanism.
+ */
+async function settle(frames = 3) {
+  const target = await page.evaluate((n) => {
+    const loop = window.__viewer.loop;
+    const from = loop.stats.rendered;
+    loop.invalidate(n);
+    return from + n;
+  }, frames);
+
+  await page.waitForFunction(
+    (want) => window.__viewer.loop.stats.rendered >= want,
+    target,
+    { timeout: 30_000 },
+  );
+
+  // One more paint after the last render lands, so the capture sees a
+  // committed frame rather than one still in flight.
+  await page.waitForTimeout(80);
 }
 
 // --- depth of field (Track 6.1) -------------------------------------------
@@ -277,7 +307,7 @@ check(
 );
 
 await page.evaluate(async () => { await window.__viewer.post.setDof(true); });
-await settle(600);
+await settle();
 const dofOn = await viewportHash();
 check('DOF changes the rendered image', dofOn !== baseline);
 check('composer is active with DOF alone', await page.evaluate(() => window.__viewer.post.active));
@@ -335,7 +365,7 @@ await setControl('bloomStrength', 1.5);
 await setControl('ambientSlider', 2.4);
 await setControl('leftColor', '#00ff00');
 await setControl('pixelateSize', 24);
-await settle(700);
+await settle();
 
 const cranked = await viewportHash();
 check('an over-cranked setup changes the image', cranked !== baseline);
@@ -358,7 +388,7 @@ const resetState = await page.evaluate(() => {
 });
 // Reset unchecks toggles via .click(), whose handlers are async.
 await page.waitForFunction(() => window.__viewer.post.styleEffectCount === 0, null, { timeout: 20_000 });
-await settle(700);
+await settle();
 
 check('reset unchecks the effects it turned on',
   resetState.bloomOn === false && resetState.pixelateOn === false,
@@ -383,7 +413,7 @@ check('reset returns the image to the baseline exactly', (await viewportHash()) 
 console.log('\nOutline');
 
 await page.evaluate(async () => { await window.__viewer.post.setOutline(true); });
-await settle(900);
+await settle();
 const outlineOn = await viewportHash();
 check('Outline changes the rendered image', outlineOn !== baseline);
 check('composer is active with outline alone', await page.evaluate(() => window.__viewer.post.active));
@@ -403,7 +433,7 @@ check('Outline colour is a real dial', (await viewportHash()) !== outlineOn);
 await page.evaluate(() => window.__viewer.post.setOutlineColor('#101018'));
 await settle();
 await page.evaluate(async () => { await window.__viewer.post.setDither(true); });
-await settle(900);
+await settle();
 const outlineWithStyle = await viewportHash();
 check('Outline coexists with a Style pass', outlineWithStyle !== outlineOn && outlineWithStyle !== baseline);
 
@@ -533,7 +563,7 @@ const halftoneDots = await viewportHash();
 // arbitrarily long runs, which needs multi-pass bitonic sorting; the visible
 // difference is that streaks stop at the run length.
 await page.evaluate(async () => { await window.__viewer.post.setPixelSort(true); });
-await settle(1200);
+await settle();
 const sortOn = await viewportHash();
 check('Pixel sort changes the rendered image', sortOn !== baseline);
 
@@ -569,7 +599,7 @@ await settle();
 // with a plain level count instead, which reaches the 1-bit/newsprint territory
 // the palette pass cannot.
 await page.evaluate(async () => { await window.__viewer.post.setDither(true); });
-await settle(800);
+await settle();
 const dither4 = await viewportHash();
 check('Dither changes the rendered image', dither4 !== baseline);
 
@@ -603,7 +633,7 @@ await settle();
 // Voronoi (Phase 9). One cell shader, three readings of the same
 // nearest-site answer: paint the cell, draw its boundary, or displace it.
 await page.evaluate(async () => { await window.__viewer.post.setVoronoi(true); });
-await settle(800);
+await settle();
 const voronoiMosaic = await viewportHash();
 check('Voronoi changes the rendered image', voronoiMosaic !== baseline);
 
@@ -631,7 +661,7 @@ await settle();
 // whose cost scales with the square of a user-facing slider, which is why its
 // radius is capped at 8 in both the shader and the UI.
 await page.evaluate(async () => { await window.__viewer.post.setKuwahara(true); });
-await settle(800);
+await settle();
 const painterly = await viewportHash();
 check('Painterly changes the rendered image', painterly !== baseline);
 
@@ -656,7 +686,7 @@ await settle();
 // actually hands over, and no amount of brightness/contrast maths reproduces
 // one.
 await page.evaluate(async () => { await window.__viewer.post.setLut(true); });
-await settle(700);
+await settle();
 const lutOn = await viewportHash();
 check('LUT changes the rendered image', lutOn !== baseline);
 
@@ -693,7 +723,7 @@ const lutFile = await page.evaluate(async () => {
   window.__viewer.post.setLutTexture(texture);
   return { title, size: texture.image.width };
 });
-await settle(700);
+await settle();
 check('a .cube file parses into a usable LUT', lutFile.title === 'Test' && lutFile.size === 2,
   `title "${lutFile.title}", size ${lutFile.size}`);
 check('a loaded .cube changes the rendered image', (await viewportHash()) !== baseline);

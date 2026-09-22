@@ -54,6 +54,14 @@ export function createKeyframes({ settings, onChange = () => {} }) {
 
   let armed = false;
 
+  // True only while apply() is writing. Capture has to stand down during that
+  // window: writeField assigns the element and dispatches an event, and for a
+  // checkbox that means .click(), whose event DOES bubble - so an armed
+  // session would capture apply()'s own writes as new keyframes and feed the
+  // track back into itself. Caught by a test where re-applying t=0 after t=1
+  // left the effect switched on and the stored value at t=0.4 had flipped.
+  let applying = false;
+
   /**
    * Whether a kind blends between keys or jumps at them.
    *
@@ -153,12 +161,14 @@ export function createKeyframes({ settings, onChange = () => {} }) {
   function apply(t) {
     if (tracks.size === 0) return;
     settings.suspend();
+    applying = true;
     try {
       for (const id of tracks.keys()) {
         const value = valueAt(id, t);
         if (value !== undefined) settings.writeFieldById(id, value);
       }
     } finally {
+      applying = false;
       settings.resume();
     }
   }
@@ -177,6 +187,11 @@ export function createKeyframes({ settings, onChange = () => {} }) {
       const value = settings.readFieldById(id);
       if (value === undefined) return false;
       return setKey(id, t, value);
+    },
+
+    /** True while apply() is writing - capture must ignore those edits. */
+    get applying() {
+      return applying;
     },
 
     get armed() {

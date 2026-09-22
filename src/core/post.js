@@ -439,6 +439,26 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   }
 
   return {
+    /**
+     * Build the composer and every pass without enabling any of them.
+     *
+     * Exists for keyframed on/off state. Enabling a Style effect is async the
+     * first time - setStyleEnabled() awaits build(), which imports every pass
+     * module - so a keyframe that switches an effect on mid-playback would
+     * trigger that import inside a recording and drop frames exactly where the
+     * effect appears. Called once before playback, every later toggle is a
+     * synchronous "pass.enabled = x" with nothing to await.
+     *
+     * Safe to call at any time and idempotent: building the composer does not
+     * put it in the output path, since active() still depends on whether any
+     * effect is actually switched on.
+     */
+    async prewarm() {
+      if (composer) return;
+      const size = currentSize();
+      await build(size.x, size.y);
+    },
+
     /** Whether the composer is currently in the output path. */
     get active() {
       return active();

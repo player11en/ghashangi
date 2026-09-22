@@ -512,6 +512,10 @@ function playheadTime() {
  */
 function handleArmedEdit(event) {
   if (!keyframes.armed) return;
+  // apply() writes through the same elements a person would touch, and a
+  // checkbox write dispatches a bubbling click - without this, playback would
+  // keyframe its own output.
+  if (keyframes.applying) return;
   const id = event.target?.id;
   if (!id || id === 'cpScrub' || id === 'kfArm') return;
   // Paired readouts mirror their slider and would key the same field twice.
@@ -567,9 +571,21 @@ rebuildKeyframeList = () => {
   }
 };
 
-bindCheckbox('kfArm', (on) => {
+bindCheckbox('kfArm', async (on) => {
   keyframes.armed = on;
   syncKeyframeRows();
+  // Pre-roll. Enabling a Style effect is async the first time - it imports
+  // every pass module - so a keyframe that switches one on during playback
+  // would trigger that download inside a recording and drop frames exactly
+  // where the effect appears. Arming is the moment someone has declared intent
+  // to animate, so the cost is paid here where nothing is being captured.
+  if (on) {
+    try {
+      await viewer.post.prewarm();
+    } catch (error) {
+      console.error('[Ghashangi] could not prepare the effect chain', error);
+    }
+  }
 });
 
 $('kfClear').addEventListener('click', () => keyframes.clear());

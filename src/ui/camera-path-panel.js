@@ -114,6 +114,7 @@ export function createCameraPathPanel({
       unlockAspect(container, viewer, previewAspectLock);
       previewAspectLock = null;
     } else {
+      viewer.post.prewarm().catch(() => {});
       previewAspectLock = lockAspect(container, viewer, aspect());
       cameraPath.play({ duration: duration(), loop: true });
     }
@@ -130,6 +131,10 @@ export function createCameraPathPanel({
    * the object-URL cleanup is exactly the kind of thing that rots.
    */
   async function runRecording({ button, suffix, label: what, record }) {
+    // See post.prewarm(): a keyframed effect toggle must not import its module
+    // mid-capture. Idempotent, so paying it again here costs nothing.
+    await viewer.post.prewarm().catch(() => {});
+
     if (cameraPath.playing) {
       cameraPath.stop();
       unlockAspect(container, viewer, previewAspectLock);

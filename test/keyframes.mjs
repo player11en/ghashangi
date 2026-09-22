@@ -180,12 +180,81 @@ const storageUntouched = await page.evaluate(() => {
 });
 check('playback does not write to localStorage', storageUntouched);
 
+// --- keyframed on/off state ------------------------------------------------
+//
+// The case the pre-roll exists for. Enabling a Style effect is async the first
+// time - it imports every pass module - so a keyframe switching one on during
+// playback would trigger that download inside a recording. post.prewarm()
+// builds the composer up front, after which a toggle is a synchronous
+// pass.enabled assignment.
+//
+// The feedback guard is the other thing under test here, and it was a real bug:
+// writeField on a checkbox calls .click(), whose event bubbles, so an armed
+// session captured apply()'s own writes as new keyframes and fed each track
+// back into itself.
+
+console.log('\nOn/off keys');
+
+await page.evaluate(() => window.__viewer.post.prewarm());
+await page.waitForTimeout(2000);
+
+const toggleKeys = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  kf.clear();
+  kf.setKey('bloomToggle', 0, false);
+  kf.setKey('bloomToggle', 1, true);
+  const read = () => ({
+    box: document.getElementById('bloomToggle').checked,
+    count: window.__viewer.post.styleEffectCount,
+  });
+  kf.apply(0); const off = read();
+  kf.apply(1); const on = read();
+  kf.apply(0); const back = read();
+  return { off, on, back, keys: kf.keysFor('bloomToggle').length };
+});
+
+check('a keyed toggle switches the real pass on',
+  toggleKeys.on.box === true && toggleKeys.on.count === 1,
+  `checkbox ${toggleKeys.on.box}, active effects ${toggleKeys.on.count}`);
+check('and switches it back off when the playhead returns',
+  toggleKeys.back.box === false && toggleKeys.back.count === 0,
+  `checkbox ${toggleKeys.back.box}, active effects ${toggleKeys.back.count}`);
+check('applying does not keyframe its own writes',
+  toggleKeys.keys === 2, `${toggleKeys.keys} keys on the track`);
+
+const toggleStep = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  return { early: kf.valueAt('bloomToggle', 0.4), late: kf.valueAt('bloomToggle', 0.99) };
+});
+check('a toggle holds its value until the next key, never partially on',
+  toggleStep.early === false && toggleStep.late === false,
+  `0.4 -> ${toggleStep.early}, 0.99 -> ${toggleStep.late}`);
+
+// With the composer pre-warmed there is nothing left to await, so this has to
+// complete inside a frame budget rather than stalling a capture.
+const toggleSpeed = await page.evaluate(() => {
+  const started = performance.now();
+  window.__keyframes.apply(1);
+  return { ms: performance.now() - started, count: window.__viewer.post.styleEffectCount };
+});
+check('a pre-warmed toggle applies within a frame',
+  toggleSpeed.ms < 16 && toggleSpeed.count === 1,
+  `${toggleSpeed.ms.toFixed(1)}ms`);
+
+await page.evaluate(() => window.__keyframes.clear());
+
 // --- managing tracks -------------------------------------------------------
 
 console.log('\nTrack management');
 
 const removal = await page.evaluate(() => {
   const kf = window.__keyframes;
+  // Set up its own state rather than inheriting whatever the previous section
+  // left behind - a test that depends on earlier state breaks whenever those
+  // sections are reordered, which is exactly what happened here.
+  kf.clear();
+  kf.setKey('toneMapping', 0, 'agx');
+  kf.setKey('ambientSlider', 0, 0.5);
   const before = kf.trackCount;
   kf.clearTrack('toneMapping');
   const after = kf.trackCount;
