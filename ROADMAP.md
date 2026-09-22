@@ -145,21 +145,51 @@ up; not worth it on speculation.
 
 ---
 
-## Phase 8.5 — Progressive disclosure, not a Pro mode
+## Phase 8.5 — Progressive disclosure, not a Pro mode — **SHIPPED**
 
-119 controls exist now, and every future phase adds more. The question of how
-to keep that from burying a first-time user came up as "split the app into
-Open and Pro", and the answer landed on **one interface with an Advanced
-reveal** instead. Recorded with the reasoning because the panel-split question
-has now been asked three times, and a fourth time should start from here
-rather than from scratch.
+The question of how ~120 controls stay approachable came up as "split the app
+into Open and Pro", and the answer landed on **one interface with an Advanced
+reveal** instead. Kept with its reasoning because the panel-split question has
+now been asked three times, and a fourth should start from the argument rather
+than from scratch.
 
-**What gets built.** Each control carries a `data-advanced` flag. One switch in
-the panel header toggles it. Off, the panel shows roughly the forty controls
-that matter for "open a model and make it look good" across the same five
-tabs. On, it shows everything. The timeline from Phase 10 lands as a
-collapsed-by-default section either way, because it genuinely is a large
-surface — but collapsed is not the same thing as a separate application.
+**What shipped.** 71 rows carry `data-advanced`; one switch in the panel
+header reveals them. Measured on the real panel: **40 visible controls with it
+off, 62 with it on**, out of 124 total. The Style tab is where it bites
+hardest — with three effects enabled it shows **15 controls simple against 30
+advanced**, and those 15 are the 13 effect toggles plus the two preset
+dropdowns those effects expose.
+
+That split is deliberate: an effect's **toggle and its preset/mode dropdown
+stay visible**, because picking a look is the easy-entry path, while its
+numeric parameters are the part you opt into. Hand-tuning CRT's scanline
+parameters is advanced; choosing "VHS" is not.
+
+**The rule that makes it safe**, and the reason it was chosen over a mode
+split: **a control changed from its shipped default stays visible even with
+Advanced off.** Nothing that is affecting the render can ever be hidden, so
+switching Advanced off can only ever hide controls doing nothing. It tracks
+the live value rather than a one-way "was touched" flag — returning a control
+to its default lets it tuck away again, verified in the suite both directions.
+
+Hiding uses a class, not the `hidden` attribute, because rows already use that
+attribute for their own conditional logic (a Style effect's parameters appear
+when the effect is switched on). Two independent reasons to hide one element
+cannot share one attribute without clobbering each other; a test asserts they
+compose.
+
+**One bug introduced and caught by the suite**, worth recording because it is
+a general shape: `refresh()` ran on every input event and re-queried all 71
+rows with a linear field lookup per control, and `settings.load()` dispatches
+an event for every tracked field at startup — so a page reload did on the
+order of 700,000 DOM queries and blew past a 30-second timeout. The
+tab-persistence check, which reloads the page, is what surfaced it. Fixed by
+resolving the rows once (they are static markup) and coalescing refreshes to
+one per frame, plus a Map for field lookup in settings.js.
+
+The timeline from Phase 10 still lands as a collapsed-by-default section
+regardless — it genuinely is a large surface — but collapsed is not the same
+thing as a separate application.
 
 **The rule that makes it safe: a control changed from its default stays
 visible even with Advanced off.** Nothing that is actively affecting the

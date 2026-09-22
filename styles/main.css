@@ -133,6 +133,36 @@ body {
   display: contents;
 }
 
+/* --- advanced disclosure ------------------------------------------------- */
+/* A separate class rather than the hidden attribute: rows already use it
+   for their own conditional logic (a Style effect's parameters appear when the
+   effect is on), and two independent reasons to hide one element cannot share
+   one attribute without clobbering each other. */
+
+.advanced-hidden { display: none !important; }
+
+.advanced-switch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.advanced-switch:hover { color: var(--text); }
+
+.advanced-switch input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
 /* --- frame guide --------------------------------------------------------- */
 /* Dimmed bars marking the region outside the export frame. pointer-events is
    the load-bearing line: every gesture has to reach the canvas underneath, or

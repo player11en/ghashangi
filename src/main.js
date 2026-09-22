@@ -9,6 +9,7 @@ import { createAnimationPanel } from './ui/animation-panel.js';
 import { createAccordion } from './ui/accordion.js';
 import { createTabs } from './ui/tabs.js';
 import { createFrameGuide } from './ui/frame-guide.js';
+import { createAdvanced } from './ui/advanced.js';
 import { createShortcuts } from './ui/shortcuts.js';
 import { createSettings } from './core/settings.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
@@ -88,6 +89,13 @@ const settings = createSettings({
   orientation: viewer.orientation,
   post: viewer.post,
 });
+
+// Built after settings so it can ask which controls are still at their
+// shipped defaults - the rule that keeps a changed control visible even with
+// Advanced off, so nothing affecting the render is ever hidden.
+const advanced = createAdvanced($('panelBody'), { isAtDefault: settings.isAtDefault });
+
+bindCheckbox('advancedToggle', (on) => advanced.setEnabled(on));
 
 // Registers its own viewer callback, so it rebuilds itself on every load.
 const animationPanel = createAnimationPanel({ viewer, onRebuild: tabs.syncVisibility });
@@ -527,6 +535,9 @@ function resetAllSettings() {
   syncStyleRows();
   syncStageRows();
   syncDofFocusFromSubject();
+  // Everything is back at its default, so every advanced row that was pinned
+  // visible by having been touched should tuck itself away again.
+  advanced.refresh();
 }
 
 // Confirmed first: this discards a whole session of lighting, Style and

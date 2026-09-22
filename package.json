@@ -31,7 +31,8 @@
     "test:remote": "node test/remote.mjs",
     "test:inspect": "node test/inspect.mjs",
     "test:errors": "node test/errors.mjs",
-    "test:ui": "node test/ui-shot.mjs"
+    "test:ui": "node test/ui-shot.mjs",
+    "images": "node scripts/build-images.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

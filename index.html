@@ -10,18 +10,29 @@
   <meta name="color-scheme" content="dark light">
   <title>Ghashangi</title>
 
-  <!-- No image asset in the repo, so the icon is an inline SVG data URI: a
-       simple isometric cube in the app's own accent blue. Cheap, no extra
-       request, and trivial to swap for a real logo file later. -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,4 93,27 93,73 50,96 7,73 7,27' fill='%234a9eff'/%3E%3Cpolygon points='50,4 93,27 50,50 7,27' fill='%237fbcff'/%3E%3Cpolygon points='7,27 50,50 50,96 7,73' fill='%232f6fc4'/%3E%3C/svg%3E">
+  <!-- Generated from the masters in assets-src/ by `npm run images`, at the
+       sizes each slot actually uses. Serving the 650px master as a favicon
+       would be 223 KB for something drawn at 16px. -->
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./favicon-180.png">
 
+  <!-- Absolute URLs: a crawler resolving a link preview has no page context to
+       resolve a relative path against. -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Ghashangi">
   <meta property="og:description" content="Load a 3D model, light it, recolour materials, style it with CRT/glitch/ASCII/retro-palette effects, and export images or a camera-move clip. Free, open source, runs in the browser.">
   <meta property="og:url" content="https://ghashangi.playereleven.de">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://ghashangi.playereleven.de/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A 3D graphics card rendered on a studio backdrop, beside Ghashangi's control panel.">
+
+  <!-- summary_large_image rather than summary now that there is a real card
+       image: summary would crop it to a small square thumbnail. -->
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Ghashangi">
   <meta name="twitter:description" content="Load a 3D model, light it, recolour materials, style it with CRT/glitch/ASCII/retro-palette effects, and export images or a camera-move clip. Free, open source, runs in the browser.">
+  <meta name="twitter:image" content="https://ghashangi.playereleven.de/og-image.png">
 
   <link rel="stylesheet" href="./styles/main.css">
 </head>
@@ -41,6 +52,10 @@
   <aside id="panel" class="panel" aria-label="Viewer controls">
     <header class="panel-head">
       <h1 class="panel-title">Ghashangi</h1>
+      <label class="advanced-switch" title="Show every control. Anything you have already changed stays visible either way.">
+        <input type="checkbox" id="advancedToggle">
+        <span>Advanced</span>
+      </label>
       <button type="button" id="panelToggle" class="icon-button" aria-expanded="true"
               aria-controls="panelBody" title="Collapse panel">−</button>
     </header>
@@ -115,16 +130,16 @@
             <input type="checkbox" id="stageToggle" checked>
             <label for="stageToggle">Show stage</label>
           </div>
-          <div class="row" data-stage>
+          <div data-advanced class="row" data-stage>
             <label for="stageColor">Stage color</label>
             <input type="color" id="stageColor" value="#e7e7e7">
           </div>
-          <div class="row" data-stage>
+          <div data-advanced class="row" data-stage>
             <label for="stageRoughness">Stage roughness</label>
             <input type="range" id="stageRoughness" min="0" max="1" step="0.05" value="0.5">
             <input type="text" inputmode="decimal" class="value-input" id="stageRoughnessOut" value="0.50" aria-label="Stage roughness value">
           </div>
-          <div class="row row-check">
+          <div data-advanced class="row row-check">
             <input type="checkbox" id="wireframe">
             <label for="wireframe" title="Shortcut: W">Wireframe</label>
           </div>
@@ -146,21 +161,21 @@
             </div>
           </div>
 
-          <div class="row row-axis">
+          <div data-advanced class="row row-axis">
             <label for="rotX">Rotate X</label>
             <button type="button" class="nudge" data-axis="x" data-delta="-90" aria-label="Rotate X minus 90 degrees">−90</button>
             <input type="range" id="rotX" min="-180" max="180" step="1" value="0">
             <button type="button" class="nudge" data-axis="x" data-delta="90" aria-label="Rotate X plus 90 degrees">+90</button>
             <input type="text" inputmode="decimal" class="value-input" id="rotXOut" value="0°" aria-label="Rotate X value">
           </div>
-          <div class="row row-axis">
+          <div data-advanced class="row row-axis">
             <label for="rotY">Rotate Y</label>
             <button type="button" class="nudge" data-axis="y" data-delta="-90" aria-label="Rotate Y minus 90 degrees">−90</button>
             <input type="range" id="rotY" min="-180" max="180" step="1" value="0">
             <button type="button" class="nudge" data-axis="y" data-delta="90" aria-label="Rotate Y plus 90 degrees">+90</button>
             <input type="text" inputmode="decimal" class="value-input" id="rotYOut" value="0°" aria-label="Rotate Y value">
           </div>
-          <div class="row row-axis">
+          <div data-advanced class="row row-axis">
             <label for="rotZ">Rotate Z</label>
             <button type="button" class="nudge" data-axis="z" data-delta="-90" aria-label="Rotate Z minus 90 degrees">−90</button>
             <input type="range" id="rotZ" min="-180" max="180" step="1" value="0">
@@ -219,27 +234,27 @@
               <input type="range" id="matBlend" min="0" max="1" step="0.01" value="1">
               <input type="text" inputmode="decimal" class="value-input" id="matBlendOut" value="100%" aria-label="Blend value">
             </div>
-            <div class="row" data-channel="metalness">
+            <div data-advanced class="row" data-channel="metalness">
               <label for="matMetalness">Metalness</label>
               <input type="range" id="matMetalness" min="0" max="1" step="0.01" value="0">
               <input type="text" inputmode="decimal" class="value-input" id="matMetalnessOut" value="0.00" aria-label="Metalness value">
             </div>
-            <div class="row" data-channel="roughness">
+            <div data-advanced class="row" data-channel="roughness">
               <label for="matRoughness">Roughness</label>
               <input type="range" id="matRoughness" min="0" max="1" step="0.01" value="1">
               <input type="text" inputmode="decimal" class="value-input" id="matRoughnessOut" value="1.00" aria-label="Roughness value">
             </div>
-            <div class="row" data-channel="emissive">
+            <div data-advanced class="row" data-channel="emissive">
               <label for="matEmissive">Emissive</label>
               <input type="color" id="matEmissive" value="#000000">
               <input type="text" inputmode="decimal" class="value-input" id="matEmissiveOut" value="#000000" aria-label="Emissive colour hex value">
             </div>
-            <div class="row" data-channel="emissiveIntensity">
+            <div data-advanced class="row" data-channel="emissiveIntensity">
               <label for="matEmissiveIntensity">Glow</label>
               <input type="range" id="matEmissiveIntensity" min="0" max="5" step="0.05" value="1">
               <input type="text" inputmode="decimal" class="value-input" id="matEmissiveIntensityOut" value="1.00" aria-label="Glow value">
             </div>
-            <div class="row" data-channel="opacity">
+            <div data-advanced class="row" data-channel="opacity">
               <label for="matOpacity">Opacity</label>
               <input type="range" id="matOpacity" min="0" max="1" step="0.01" value="1">
               <input type="text" inputmode="decimal" class="value-input" id="matOpacityOut" value="1.00" aria-label="Opacity value">
@@ -295,25 +310,25 @@
             <input type="range" id="sunSlider" min="0" max="5" step="0.05" value="1.8">
             <input type="text" inputmode="decimal" class="value-input" id="sunOut" value="1.80" aria-label="Sun light value">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="sunColor">Sun color</label>
             <input type="color" id="sunColor" value="#ffffff">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="leftSlider">Left fill</label>
             <input type="range" id="leftSlider" min="0" max="30" step="0.1" value="4.5">
             <input type="text" inputmode="decimal" class="value-input" id="leftOut" value="4.5" aria-label="Left fill light value">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="leftColor">Left fill color</label>
             <input type="color" id="leftColor" value="#b2b2ff">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="rightSlider">Right fill</label>
             <input type="range" id="rightSlider" min="0" max="30" step="0.1" value="2.1">
             <input type="text" inputmode="decimal" class="value-input" id="rightOut" value="2.1" aria-label="Right fill light value">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="rightColor">Right fill color</label>
             <input type="color" id="rightColor" value="#ff9898">
           </div>
@@ -337,12 +352,12 @@
             <input type="range" id="exposureSlider" min="0" max="3" step="0.05" value="0.6">
             <input type="text" inputmode="decimal" class="value-input" id="exposureOut" value="0.60" aria-label="Exposure value">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="envIntensity">Env intensity</label>
             <input type="range" id="envIntensity" min="0" max="3" step="0.05" value="1">
             <input type="text" inputmode="decimal" class="value-input" id="envIntensityOut" value="1.00" aria-label="Environment intensity value">
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="envRotation">Env rotation</label>
             <input type="range" id="envRotation" min="0" max="360" step="1" value="0">
             <input type="text" inputmode="decimal" class="value-input" id="envRotationOut" value="0°" aria-label="Environment rotation value">
@@ -380,12 +395,12 @@
             <input type="checkbox" id="aoToggle">
             <label for="aoToggle">Ambient occlusion</label>
           </div>
-          <div class="row" data-ao>
+          <div data-advanced class="row" data-ao>
             <label for="aoIntensity">AO strength</label>
             <input type="range" id="aoIntensity" min="0" max="2" step="0.05" value="1">
             <input type="text" inputmode="decimal" class="value-input" id="aoIntensityOut" value="1.00" aria-label="AO strength value">
           </div>
-          <div class="row" data-ao>
+          <div data-advanced class="row" data-ao>
             <label for="aoRadius">AO radius</label>
             <input type="range" id="aoRadius" min="0.02" max="1" step="0.01" value="0.25">
             <input type="text" inputmode="decimal" class="value-input" id="aoRadiusOut" value="0.25" aria-label="AO radius value">
@@ -402,17 +417,17 @@
             <input type="checkbox" id="dofToggle">
             <label for="dofToggle">Depth of field</label>
           </div>
-          <div class="row" data-dof>
+          <div data-advanced class="row" data-dof>
             <label for="dofFocus">Focus distance</label>
             <input type="range" id="dofFocus" min="0.5" max="60" step="0.5" value="18">
             <input type="text" inputmode="decimal" class="value-input" id="dofFocusOut" value="18.0" aria-label="Focus distance value">
           </div>
-          <div class="row" data-dof>
+          <div data-advanced class="row" data-dof>
             <label for="dofAperture">Aperture</label>
             <input type="range" id="dofAperture" min="0" max="0.02" step="0.0005" value="0.002">
             <output for="dofAperture" id="dofApertureOut">0.0020</output>
           </div>
-          <div class="row" data-dof>
+          <div data-advanced class="row" data-dof>
             <label for="dofMaxBlur">Max blur</label>
             <input type="range" id="dofMaxBlur" min="0" max="0.05" step="0.001" value="0.01">
             <output for="dofMaxBlur" id="dofMaxBlurOut">0.010</output>
@@ -445,7 +460,7 @@
             <input type="checkbox" id="bloomToggle">
             <label for="bloomToggle">Bloom</label>
           </div>
-          <div class="row" data-bloom>
+          <div data-advanced class="row" data-bloom>
             <label for="bloomStrength">Bloom strength</label>
             <input type="range" id="bloomStrength" min="0" max="2" step="0.05" value="0.6">
             <input type="text" inputmode="decimal" class="value-input" id="bloomStrengthOut" value="0.60" aria-label="Bloom strength value">
@@ -454,12 +469,12 @@
                bloom reads as "the whole image is blown out": every pixel above
                0.7 luminance blooms and the only available response is dimming
                strength, which also dims the highlights that should bloom. -->
-          <div class="row" data-bloom>
+          <div data-advanced class="row" data-bloom>
             <label for="bloomThreshold">Bloom threshold</label>
             <input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.7">
             <input type="text" inputmode="decimal" class="value-input" id="bloomThresholdOut" value="0.70" aria-label="Bloom threshold value">
           </div>
-          <div class="row" data-bloom>
+          <div data-advanced class="row" data-bloom>
             <label for="bloomRadius">Bloom radius</label>
             <input type="range" id="bloomRadius" min="0" max="1" step="0.05" value="0.4">
             <input type="text" inputmode="decimal" class="value-input" id="bloomRadiusOut" value="0.40" aria-label="Bloom radius value">
@@ -472,7 +487,7 @@
             <input type="checkbox" id="glitchToggle">
             <label for="glitchToggle">Glitch</label>
           </div>
-          <div class="row row-check" data-glitch>
+          <div data-advanced class="row row-check" data-glitch>
             <input type="checkbox" id="glitchWild">
             <label for="glitchWild">Wild mode</label>
           </div>
@@ -480,17 +495,17 @@
             <input type="checkbox" id="pixelateToggle">
             <label for="pixelateToggle">Pixelate</label>
           </div>
-          <div class="row" data-pixelate>
+          <div data-advanced class="row" data-pixelate>
             <label for="pixelateSize">Pixel size</label>
             <input type="range" id="pixelateSize" min="2" max="48" step="1" value="6">
             <input type="text" inputmode="numeric" class="value-input" id="pixelateSizeOut" value="6px" aria-label="Pixel size">
           </div>
-          <div class="row" data-pixelate>
+          <div data-advanced class="row" data-pixelate>
             <label for="pixelateAspect">Pixel aspect</label>
             <input type="range" id="pixelateAspect" min="0.25" max="4" step="0.05" value="1">
             <input type="text" inputmode="decimal" class="value-input" id="pixelateAspectOut" value="1.00" aria-label="Pixel aspect ratio">
           </div>
-          <div class="row" data-pixelate>
+          <div data-advanced class="row" data-pixelate>
             <label for="pixelateGrid">Grid lines</label>
             <input type="range" id="pixelateGrid" min="0" max="1" step="0.05" value="0">
             <input type="text" inputmode="decimal" class="value-input" id="pixelateGridOut" value="0.00" aria-label="Pixel grid strength">
@@ -507,12 +522,12 @@
               <option value="atari">Atari</option>
             </select>
           </div>
-          <div class="row" data-palette>
+          <div data-advanced class="row" data-palette>
             <label for="pixelSize">Pixel size</label>
             <input type="range" id="pixelSize" min="1" max="16" step="1" value="4">
             <output for="pixelSize" id="pixelSizeOut">4px</output>
           </div>
-          <div class="row" data-palette>
+          <div data-advanced class="row" data-palette>
             <label for="ditherStrength">Dither</label>
             <input type="range" id="ditherStrength" min="0" max="0.3" step="0.005" value="0.06">
             <input type="text" inputmode="decimal" class="value-input" id="ditherStrengthOut" value="0.060" aria-label="Dither strength value">
@@ -531,36 +546,36 @@
               <option value="rainbow">Rainbow</option>
             </select>
           </div>
-          <div class="row" data-colorgrade>
+          <div data-advanced class="row" data-colorgrade>
             <label for="cgBrightness">Brightness</label>
             <input type="range" id="cgBrightness" min="0" max="2" step="0.05" value="1">
             <output for="cgBrightness" id="cgBrightnessOut">1.00</output>
           </div>
-          <div class="row" data-colorgrade>
+          <div data-advanced class="row" data-colorgrade>
             <label for="cgContrast">Contrast</label>
             <input type="range" id="cgContrast" min="0" max="2" step="0.05" value="1">
             <output for="cgContrast" id="cgContrastOut">1.00</output>
           </div>
-          <div class="row" data-colorgrade>
+          <div data-advanced class="row" data-colorgrade>
             <label for="cgSaturation">Saturation</label>
             <input type="range" id="cgSaturation" min="0" max="2" step="0.05" value="1">
             <output for="cgSaturation" id="cgSaturationOut">1.00</output>
           </div>
-          <div class="row" data-colorgrade>
+          <div data-advanced class="row" data-colorgrade>
             <label for="cgHue">Hue offset</label>
             <input type="range" id="cgHue" min="0" max="1" step="0.01" value="0">
             <output for="cgHue" id="cgHueOut">0°</output>
           </div>
-          <div class="row" data-colorgrade>
+          <div data-advanced class="row" data-colorgrade>
             <label for="cgSpeed">Cycle speed</label>
             <input type="range" id="cgSpeed" min="0" max="3" step="0.05" value="1">
             <output for="cgSpeed" id="cgSpeedOut">1.00</output>
           </div>
-          <div class="row" data-colorgrade-duotone>
+          <div data-advanced class="row" data-colorgrade-duotone>
             <label for="cgLightColor">Light color</label>
             <input type="color" id="cgLightColor" value="#ffe699">
           </div>
-          <div class="row" data-colorgrade-duotone>
+          <div data-advanced class="row" data-colorgrade-duotone>
             <label for="cgDarkColor">Dark color</label>
             <input type="color" id="cgDarkColor" value="#0d0d33">
           </div>
@@ -577,22 +592,22 @@
               <option value="edges">Edges</option>
             </select>
           </div>
-          <div class="row" data-tone-posterize>
+          <div data-advanced class="row" data-tone-posterize>
             <label for="toneLevels">Levels</label>
             <input type="range" id="toneLevels" min="2" max="16" step="1" value="4">
             <output for="toneLevels" id="toneLevelsOut">4</output>
           </div>
-          <div class="row" data-tone-solarize>
+          <div data-advanced class="row" data-tone-solarize>
             <label for="toneThreshold">Threshold</label>
             <input type="range" id="toneThreshold" min="0" max="1" step="0.01" value="0.5">
             <output for="toneThreshold" id="toneThresholdOut">0.50</output>
           </div>
-          <div class="row" data-tone-edges>
+          <div data-advanced class="row" data-tone-edges>
             <label for="tonePassthru">Passthru</label>
             <input type="range" id="tonePassthru" min="0" max="1" step="0.01" value="0">
             <output for="tonePassthru" id="tonePassthruOut">0.00</output>
           </div>
-          <div class="row" data-tone-edges>
+          <div data-advanced class="row" data-tone-edges>
             <label for="toneEdgeColor">Edge color</label>
             <input type="color" id="toneEdgeColor" value="#ffffff">
           </div>
@@ -609,12 +624,12 @@
               <option value="tile">Tile</option>
             </select>
           </div>
-          <div class="row" data-repeat>
+          <div data-advanced class="row" data-repeat>
             <label for="repeatAmount">Amount</label>
             <input type="range" id="repeatAmount" min="2" max="16" step="1" value="6">
             <output for="repeatAmount" id="repeatAmountOut">6</output>
           </div>
-          <div class="row" data-repeat>
+          <div data-advanced class="row" data-repeat>
             <label for="repeatAngle">Angle</label>
             <input type="range" id="repeatAngle" min="0" max="360" step="1" value="0">
             <output for="repeatAngle" id="repeatAngleOut">0°</output>
@@ -633,22 +648,22 @@
               <option value="shake">Shake</option>
             </select>
           </div>
-          <div class="row" data-displace>
+          <div data-advanced class="row" data-displace>
             <label for="displaceAmount">Amount</label>
             <input type="range" id="displaceAmount" min="0" max="5" step="0.1" value="1">
             <output for="displaceAmount" id="displaceAmountOut">1.0</output>
           </div>
-          <div class="row" data-displace>
+          <div data-advanced class="row" data-displace>
             <label for="displaceSize">Size</label>
             <input type="range" id="displaceSize" min="0.1" max="5" step="0.1" value="1">
             <output for="displaceSize" id="displaceSizeOut">1.0</output>
           </div>
-          <div class="row" data-displace>
+          <div data-advanced class="row" data-displace>
             <label for="displaceSpeed">Speed</label>
             <input type="range" id="displaceSpeed" min="0" max="5" step="0.1" value="1">
             <output for="displaceSpeed" id="displaceSpeedOut">1.0</output>
           </div>
-          <div class="row" data-displace>
+          <div data-advanced class="row" data-displace>
             <label for="displaceAngle">Angle</label>
             <input type="range" id="displaceAngle" min="0" max="360" step="1" value="0">
             <output for="displaceAngle" id="displaceAngleOut">0°</output>
@@ -658,7 +673,7 @@
             <input type="checkbox" id="afterimageToggle">
             <label for="afterimageToggle">Trails</label>
           </div>
-          <div class="row" data-afterimage>
+          <div data-advanced class="row" data-afterimage>
             <label for="afterimageTrail">Trail length</label>
             <input type="range" id="afterimageTrail" min="0" max="1" step="0.01" value="0.55">
             <output for="afterimageTrail" id="afterimageTrailOut">0.55</output>
@@ -678,44 +693,44 @@
               <option value="custom">Custom</option>
             </select>
           </div>
-          <div class="row" data-ascii-custom>
+          <div data-advanced class="row" data-ascii-custom>
             <label for="asciiCustomRamp">Custom chars</label>
             <input type="text" id="asciiCustomRamp" placeholder=" .:-=+*#%@" maxlength="32">
           </div>
-          <div class="row" data-ascii>
+          <div data-advanced class="row" data-ascii>
             <label for="asciiCellW">Letter width</label>
             <input type="range" id="asciiCellW" min="3" max="40" step="1" value="8">
             <input type="text" inputmode="numeric" class="value-input" id="asciiCellWOut" value="8px" aria-label="ASCII letter width">
           </div>
-          <div class="row" data-ascii>
+          <div data-advanced class="row" data-ascii>
             <label for="asciiCellH">Letter height</label>
             <input type="range" id="asciiCellH" min="4" max="48" step="1" value="14">
             <input type="text" inputmode="numeric" class="value-input" id="asciiCellHOut" value="14px" aria-label="ASCII letter height">
           </div>
-          <div class="row" data-ascii>
+          <div data-advanced class="row" data-ascii>
             <label for="asciiSpacing">Letter spacing</label>
             <input type="range" id="asciiSpacing" min="0" max="0.7" step="0.02" value="0">
             <input type="text" inputmode="decimal" class="value-input" id="asciiSpacingOut" value="0.00" aria-label="ASCII letter spacing">
           </div>
-          <div class="row" data-ascii>
+          <div data-advanced class="row" data-ascii>
             <label for="asciiContrast">Contrast</label>
             <input type="range" id="asciiContrast" min="0.4" max="3" step="0.05" value="1">
             <input type="text" inputmode="decimal" class="value-input" id="asciiContrastOut" value="1.00" aria-label="ASCII contrast">
           </div>
-          <div class="row" data-ascii>
+          <div data-advanced class="row" data-ascii>
             <label for="asciiBrightness">Brightness</label>
             <input type="range" id="asciiBrightness" min="-0.5" max="0.5" step="0.02" value="0">
             <input type="text" inputmode="decimal" class="value-input" id="asciiBrightnessOut" value="0.00" aria-label="ASCII brightness">
           </div>
-          <div class="row" data-ascii>
+          <div data-advanced class="row" data-ascii>
             <label for="asciiBgColor">Background</label>
             <input type="color" id="asciiBgColor" value="#000000">
           </div>
-          <div class="row row-check" data-ascii>
+          <div data-advanced class="row row-check" data-ascii>
             <input type="checkbox" id="asciiColorize">
             <label for="asciiColorize">Colorize</label>
           </div>
-          <div class="row row-check" data-ascii>
+          <div data-advanced class="row row-check" data-ascii>
             <input type="checkbox" id="asciiInvert">
             <label for="asciiInvert">Invert (print style)</label>
           </div>
@@ -732,17 +747,17 @@
               <option value="linocut">LinoCut</option>
             </select>
           </div>
-          <div class="row" data-halftone>
+          <div data-advanced class="row" data-halftone>
             <label for="halftoneScale">Mark size</label>
             <input type="range" id="halftoneScale" min="2" max="24" step="1" value="6">
             <output for="halftoneScale" id="halftoneScaleOut">6px</output>
           </div>
-          <div class="row" data-halftone>
+          <div data-advanced class="row" data-halftone>
             <label for="halftoneAngle">Screen angle</label>
             <input type="range" id="halftoneAngle" min="0" max="180" step="1" value="0">
             <output for="halftoneAngle" id="halftoneAngleOut">0°</output>
           </div>
-          <div class="row row-check" data-halftone>
+          <div data-advanced class="row row-check" data-halftone>
             <input type="checkbox" id="halftoneInvert">
             <label for="halftoneInvert">Invert tone</label>
           </div>
@@ -759,22 +774,22 @@
               <option value="trashed">Trashed</option>
             </select>
           </div>
-          <div class="row" data-film>
+          <div data-advanced class="row" data-film>
             <label for="filmGrain">Grain</label>
             <input type="range" id="filmGrain" min="0" max="1.5" step="0.05" value="0.5">
             <output for="filmGrain" id="filmGrainOut">0.50</output>
           </div>
-          <div class="row" data-film>
+          <div data-advanced class="row" data-film>
             <label for="filmDust">Dust</label>
             <input type="range" id="filmDust" min="0" max="1.5" step="0.05" value="0.5">
             <output for="filmDust" id="filmDustOut">0.50</output>
           </div>
-          <div class="row" data-film>
+          <div data-advanced class="row" data-film>
             <label for="filmWeave">Gate weave</label>
             <input type="range" id="filmWeave" min="0" max="2" step="0.05" value="0.6">
             <output for="filmWeave" id="filmWeaveOut">0.60</output>
           </div>
-          <div class="row" data-film>
+          <div data-advanced class="row" data-film>
             <label for="filmBurn">Light leak</label>
             <input type="range" id="filmBurn" min="0" max="1.5" step="0.05" value="0.25">
             <output for="filmBurn" id="filmBurnOut">0.25</output>
@@ -783,7 +798,7 @@
           <div class="row" id="styleOrderRow">
             <label id="styleOrderLabel">Effect chain order</label>
           </div>
-          <ol id="styleOrderList" class="style-order-list" aria-labelledby="styleOrderLabel"></ol>
+          <ol data-advanced id="styleOrderList" class="style-order-list" aria-labelledby="styleOrderLabel"></ol>
 
           <p class="hint" id="styleHint">
             Renders through the same post-processing pipeline as ambient
@@ -809,11 +824,11 @@
             <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
             <output for="shotScale" id="shotScaleOut">1×</output>
           </div>
-          <div class="row row-check">
+          <div data-advanced class="row row-check">
             <input type="checkbox" id="frameGuideToggle">
             <label for="frameGuideToggle" title="Dim everything outside the export frame, without changing the render">Show frame guide</label>
           </div>
-          <div class="row" data-frame-guide>
+          <div data-advanced class="row" data-frame-guide>
             <label for="frameGuideRatio">Frame</label>
             <select id="frameGuideRatio">
               <option value="free" selected>Free</option>
@@ -848,7 +863,7 @@
             <input type="range" id="cpDuration" min="3" max="15" step="1" value="8">
             <output for="cpDuration" id="cpDurationOut">8s</output>
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="cpAspect">Aspect</label>
             <select id="cpAspect">
               <option value="free" selected>Free</option>
@@ -911,11 +926,11 @@
             <dt>Textures</dt><dd id="statTextures">—</dd>
             <dt>Simplified</dt><dd id="statSimplify">—</dd>
           </dl>
-          <div class="row row-check">
+          <div data-advanced class="row row-check">
             <input type="checkbox" id="simplifyToggle" checked>
             <label for="simplifyToggle" title="Takes effect on the next model loaded">Simplify dense models</label>
           </div>
-          <div class="row">
+          <div data-advanced class="row">
             <label for="simplifyBudget">Triangle budget</label>
             <input type="range" id="simplifyBudget" min="50000" max="2000000" step="10000" value="500000">
             <input type="text" inputmode="numeric" class="value-input" id="simplifyBudgetOut" value="500000" aria-label="Triangle budget value">

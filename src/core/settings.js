@@ -49,6 +49,7 @@ const FIELDS = [
   { id: 'dofFocus', kind: 'range' },
   { id: 'dofAperture', kind: 'range' },
   { id: 'dofMaxBlur', kind: 'range' },
+  { id: 'advancedToggle', kind: 'checkbox' },
   { id: 'frameGuideToggle', kind: 'checkbox' },
   { id: 'frameGuideRatio', kind: 'select' },
   { id: 'qualityTier', kind: 'select' },
@@ -122,6 +123,11 @@ const FIELDS = [
   { id: 'filmWeave', kind: 'range' },
   { id: 'filmBurn', kind: 'range' },
 ];
+
+// Linear scans over ~100 fields were fine when only load() and save() walked
+// this list. isAtDefault() is called per control on every edit, so it needs a
+// lookup rather than a search.
+const FIELD_BY_ID = new Map(FIELDS.map((f) => [f.id, f]));
 
 function readField({ id, kind }) {
   const el = $(id);
@@ -235,6 +241,22 @@ export function createSettings({ accordion, tabs, orientation, post }) {
    * would for a real edit. There is no second setter path here that could
    * drift from the UI's own.
    */
+  /**
+   * Whether a control still holds the value index.html shipped with.
+   *
+   * Exposed for the Advanced reveal, whose safety rule is that a control the
+   * user has actually changed stays visible even when Advanced is off - so
+   * nothing that is affecting the render can ever be hidden. Unknown ids
+   * count as default: a control this set does not track has no saved value to
+   * differ from, and pinning it visible on that basis would be noise.
+   */
+  function isAtDefault(id) {
+    if (!(id in shippedDefaults)) return true;
+    const field = FIELD_BY_ID.get(id);
+    if (!field) return true;
+    return String(readField(field)) === String(shippedDefaults[id]);
+  }
+
   function reset() {
     for (const field of FIELDS) writeField(field, shippedDefaults[field.id]);
     post.setStyleOrder(shippedStyleOrder);
@@ -274,5 +296,5 @@ export function createSettings({ accordion, tabs, orientation, post }) {
     }
   }
 
-  return { save, load, watch, reset };
+  return { save, load, watch, reset, isAtDefault };
 }

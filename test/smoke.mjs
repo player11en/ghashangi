@@ -369,6 +369,68 @@ const reference = await page.evaluate(async () => {
 await writeFile(`${ARTIFACT_DIR}/viewport.png`, Buffer.from(reference));
 console.log(`\nReference image written to ${ARTIFACT_DIR}/viewport.png`);
 
+// --- advanced disclosure (Phase 8.5) --------------------------------------
+//
+// One panel at two depths, chosen over splitting the app into Open and Pro
+// modes. The safety rule is the reason that choice was made and is what these
+// checks exist for: a control changed from its default stays visible even with
+// Advanced off, so nothing that is actually affecting the render can ever be
+// hidden. A mode split cannot offer that - state set in one mode keeps running
+// invisibly in the other.
+
+console.log('\nAdvanced disclosure');
+
+const advOff = await page.evaluate(() => {
+  const all = [...document.querySelectorAll('[data-advanced]')];
+  return { total: all.length, hidden: all.filter((e) => e.classList.contains('advanced-hidden')).length };
+});
+check('advanced rows exist and start hidden', advOff.total > 50 && advOff.hidden === advOff.total,
+  `${advOff.hidden} of ${advOff.total} hidden`);
+
+await page.evaluate(() => document.getElementById('advancedToggle').click());
+await page.waitForTimeout(250);
+const advOn = await page.evaluate(() =>
+  [...document.querySelectorAll('[data-advanced]')].filter((e) => e.classList.contains('advanced-hidden')).length);
+check('enabling Advanced reveals all of them', advOn === 0, `${advOn} still hidden`);
+
+// The rule. Change one advanced control, switch Advanced back off, and it has
+// to stay on screen while its untouched neighbour goes away.
+await page.evaluate(() => {
+  const el = document.getElementById('leftSlider');
+  el.value = '12';
+  el.dispatchEvent(new Event('input'));
+});
+await page.waitForTimeout(150);
+await page.evaluate(() => document.getElementById('advancedToggle').click());
+await page.waitForTimeout(250);
+
+const pinned = await page.evaluate(() => ({
+  changed: !document.getElementById('leftSlider').closest('[data-advanced]').classList.contains('advanced-hidden'),
+  untouched: document.getElementById('rightSlider').closest('[data-advanced]').classList.contains('advanced-hidden'),
+}));
+check('a control changed from its default stays visible with Advanced off', pinned.changed);
+check('its untouched neighbour is still hidden', pinned.untouched);
+
+// And putting it back to the default lets it tuck away again, so the pinning
+// tracks the live value rather than a one-way "was touched once" flag.
+await page.evaluate(() => window.__settingsReset());
+await page.waitForTimeout(600);
+const afterReset = await page.evaluate(() =>
+  document.getElementById('leftSlider').closest('[data-advanced]').classList.contains('advanced-hidden'));
+check('returning to the default re-hides it', afterReset);
+
+// Hiding must not fight the rows' own conditional logic, which uses the hidden
+// attribute for "this effect is switched off".
+const composes = await page.evaluate(() => {
+  const row = document.getElementById('bloomStrength').closest('[data-advanced]');
+  return { hiddenAttr: row.hidden, advancedClass: row.classList.contains('advanced-hidden') };
+});
+check(
+  'the two hiding mechanisms compose instead of clobbering each other',
+  composes.hiddenAttr === true && composes.advancedClass === true,
+  `hidden=${composes.hiddenAttr} advanced-hidden=${composes.advancedClass}`,
+);
+
 // --- frame guide (Phase 8) -----------------------------------------------
 //
 // A passepartout overlay marking where an export will crop. The two things
@@ -548,7 +610,14 @@ check('a control on a non-default tab is actually operable', styleReachable);
 // writes by 400ms (a slider drag would otherwise hit localStorage on every
 // pixel), so wait past that before reloading rather than racing it.
 await page.waitForTimeout(700);
-await page.reload({ waitUntil: 'load' });
+// 60s to match every other wait in this file. Playwright's default is 30s,
+// and a reload here measured between 4 and 37 seconds across runs on the same
+// build - software rendering re-initialising WebGL, re-parsing the model and
+// re-generating the PMREM environment, with wide variance under load. Checked
+// against a build with the advanced module disabled before changing this: the
+// range is the same either way, so it is the environment rather than a
+// regression.
+await page.reload({ waitUntil: 'load', timeout: 60_000 });
 await page.waitForFunction(() => window.__viewer?.model != null, null, { timeout: 60_000 });
 await page.waitForTimeout(600);
 const restored = await page.evaluate(
