@@ -926,6 +926,7 @@ export function createViewer({ container }) {
         post.setGlitch(false);
         post.setCrt(false);
         post.setPixelate(false);
+        post.setLut(false);
         post.setPalette(false);
         post.setColorGrade(false);
         post.setTone(false);

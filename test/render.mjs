@@ -480,6 +480,57 @@ await page.evaluate(async () => { await window.__viewer.post.setAscii(false); })
 await page.evaluate(async () => { await window.__viewer.post.setHalftone(true); });
 await settle();
 const halftoneDots = await viewportHash();
+// LUT (Phase 9). three ships LUTPass and three LUT loaders and none of them
+// had ever been used here. The reason this earns a place next to the
+// colour-grade pass rather than replacing it: a .cube file is what a colourist
+// actually hands over, and no amount of brightness/contrast maths reproduces
+// one.
+await page.evaluate(async () => { await window.__viewer.post.setLut(true); });
+await settle(700);
+const lutOn = await viewportHash();
+check('LUT changes the rendered image', lutOn !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setLutPreset('bleach'));
+await settle();
+check('LUT preset swap changes the rendered image', (await viewportHash()) !== lutOn);
+
+// Intensity is a real dial. Deliberately NOT asserted as "intensity 0 is
+// byte-identical to no LUT at all": with every effect off the app renders
+// straight to the canvas, and enabling any effect switches to the composer
+// path (RenderPass -> ... -> OutputPass). Those two paths are not
+// bit-for-bit equal and were never claimed to be - measured, intensity 0
+// touches ~2% of pixels against the direct path while intensity 1 touches
+// ~92%. What matters is that the slider does something across its range, and
+// that switching the pass off returns to the direct path exactly, which the
+// block at the end of this section already covers for every effect.
+await page.evaluate(() => window.__viewer.post.setLutIntensity(0));
+await settle();
+const lutZero = await viewportHash();
+await page.evaluate(() => window.__viewer.post.setLutIntensity(1));
+await settle();
+check('LUT intensity 0 differs from full strength', lutZero !== (await viewportHash()));
+
+// A real .cube file, parsed through the same path the file picker uses.
+const lutFile = await page.evaluate(async () => {
+  const text = [
+    'TITLE "Test"', 'LUT_3D_SIZE 2',
+    '1.0 1.0 1.0', '0.0 1.0 1.0', '1.0 0.0 1.0', '0.0 0.0 1.0',
+    '1.0 1.0 0.0', '0.0 1.0 0.0', '1.0 0.0 0.0', '0.0 0.0 0.0',
+  ].join('\n');
+  const { parseLutFile } = await import('/src/core/passes/lut-pass.js');
+  const file = new File([text], 'test.cube', { type: 'text/plain' });
+  const { texture, title } = await parseLutFile(file);
+  window.__viewer.post.setLutTexture(texture);
+  return { title, size: texture.image.width };
+});
+await settle(700);
+check('a .cube file parses into a usable LUT', lutFile.title === 'Test' && lutFile.size === 2,
+  `title "${lutFile.title}", size ${lutFile.size}`);
+check('a loaded .cube changes the rendered image', (await viewportHash()) !== baseline);
+
+await page.evaluate(async () => { await window.__viewer.post.setLut(false); });
+await settle();
+
 check('Halftone changes the rendered image', halftoneDots !== baseline);
 
 await page.evaluate(() => window.__viewer.post.setHalftoneMode('cmyk'));

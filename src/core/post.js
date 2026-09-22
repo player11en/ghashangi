@@ -62,6 +62,7 @@ import { createToneShader, setToneMode } from './passes/tone-pass.js';
 import { createDisplaceShader, setDisplaceMode } from './passes/displace-pass.js';
 import { createAsciiShader, setAsciiRamp } from './passes/ascii-pass.js';
 import { createPixelateShader } from './passes/pixelate-pass.js';
+import { createPresetLut } from './passes/lut-pass.js';
 import { createHalftoneShader, setHalftoneMode } from './passes/halftone-pass.js';
 import { createFilmShader, applyFilmPreset } from './passes/film-pass.js';
 
@@ -78,6 +79,7 @@ async function loadModules() {
     { OutputPass },
     { ShaderPass },
     { UnrealBloomPass },
+    { LUTPass },
     { GlitchPass },
     { AfterimagePass },
     { BokehPass },
@@ -89,12 +91,13 @@ async function loadModules() {
     import('three/addons/postprocessing/OutputPass.js'),
     import('three/addons/postprocessing/ShaderPass.js'),
     import('three/addons/postprocessing/UnrealBloomPass.js'),
+    import('three/addons/postprocessing/LUTPass.js'),
     import('three/addons/postprocessing/GlitchPass.js'),
     import('three/addons/postprocessing/AfterimagePass.js'),
     import('three/addons/postprocessing/BokehPass.js'),
   ]);
   modules = {
-    EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
+    EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass, GlitchPass,
     AfterimagePass, BokehPass,
   };
   return modules;
@@ -107,7 +110,7 @@ async function loadModules() {
 // Bloom/CRT/Glitch kept their original relative slots as the default; the
 // five Track 5.3 additions land between Bloom and CRT, per the plan.
 const STYLE_KEYS = [
-  'bloom', 'colorGrade', 'tone', 'pixelate', 'palette', 'halftone', 'repeat', 'displace',
+  'bloom', 'colorGrade', 'lut', 'tone', 'pixelate', 'palette', 'halftone', 'repeat', 'displace',
   'afterimage', 'ascii', 'crt', 'film', 'glitch',
 ];
 
@@ -127,7 +130,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   // variable each, since reorderStyle() needs to address them generically.
   const passes = {};
   const styleEnabled = {
-    bloom: false, colorGrade: false, tone: false, pixelate: false, palette: false,
+    bloom: false, colorGrade: false, lut: false, tone: false, pixelate: false, palette: false,
     halftone: false, repeat: false, displace: false, afterimage: false, ascii: false,
     crt: false, film: false, glitch: false,
   };
@@ -170,6 +173,12 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   // gradient, and how much of it a look wants is a per-look decision, not a
   // constant.
   let ditherStrength = 0.06;
+  // The LUT texture currently in force, and whether it came from a file. Held
+  // here rather than on the pass because the pass only exists after the first
+  // enable, while a LUT can be chosen before that.
+  let lutTexture = null;
+  let lutPresetName = 'teal_orange';
+  let lutIntensity = 1;
   let afterimageTrail = 0.9; // 0..1 UI value; mapped to damp in applyAfterimage()
   let asciiRampName = 'classic';
   let asciiCustomRamp = '';
@@ -196,7 +205,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   async function build(width, height) {
     const {
-      EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, GlitchPass,
+      EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass, GlitchPass,
       AfterimagePass, BokehPass,
     } = await loadModules();
     if (composer) return;
@@ -242,6 +251,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // working CRT - the more common real-world reference.
     passes.bloom = new UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
     passes.colorGrade = new ShaderPass(createColorGradeShader());
+    passes.lut = new LUTPass();
     passes.tone = new ShaderPass(createToneShader());
     passes.pixelate = new ShaderPass(createPixelateShader());
     passes.palette = new ShaderPass(createPaletteShader());
@@ -268,6 +278,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     applyAO();
     applyCrtPreset(passes.crt, crtPreset);
     applyPalette(passes.palette, paletteName);
+    applyLut();
     passes.palette.uniforms.pixelSize.value = pixelSize;
     passes.palette.uniforms.ditherStrength.value = ditherStrength;
     setAsciiRamp(passes.ascii, asciiRampName, asciiCustomRamp);
@@ -334,6 +345,20 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     if (passes.ascii) passes.ascii.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.halftone) passes.halftone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.film) passes.film.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+  }
+
+  /**
+   * Push the current LUT and intensity onto the pass.
+   *
+   * Lazily builds the preset table on first use rather than at construction:
+   * generating a 32-cube is 32,768 transform calls, which is not worth paying
+   * for a pass that may never be switched on.
+   */
+  function applyLut() {
+    if (!passes.lut) return;
+    if (!lutTexture) lutTexture = createPresetLut(lutPresetName);
+    passes.lut.lut = lutTexture;
+    passes.lut.intensity = lutIntensity;
   }
 
   function applyAfterimage() {
@@ -653,6 +678,41 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       invalidate(2);
     },
 
+    // --- LUT (Phase 9) ---------------------------------------------------
+
+    setLut(enabled) {
+      return setStyleEnabled('lut', enabled);
+    },
+
+    /** Switch to one of the generated presets, discarding any loaded file. */
+    setLutPreset(name) {
+      lutPresetName = name;
+      lutTexture?.dispose();
+      lutTexture = createPresetLut(name);
+      applyLut();
+      invalidate(2);
+    },
+
+    /**
+     * Use a Data3DTexture parsed from a user's .cube/.3dl file.
+     *
+     * Takes ownership: the previous table is disposed here, because a LUT is a
+     * real GPU 3D texture (a 33-cube is ~140k texels) and loading a handful
+     * over a session would otherwise leak every one of them.
+     */
+    setLutTexture(texture) {
+      lutTexture?.dispose();
+      lutTexture = texture;
+      applyLut();
+      invalidate(2);
+    },
+
+    setLutIntensity(value) {
+      lutIntensity = value;
+      if (passes.lut) passes.lut.intensity = value;
+      invalidate(2);
+    },
+
     setHalftone(enabled) {
       return setStyleEnabled('halftone', enabled);
     },
@@ -721,6 +781,12 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
         passes[key]?.dispose?.();
         passes[key] = null;
       }
+      // LUTPass.dispose() frees its own material, not the table it was handed -
+      // that texture is owned here (setLutTexture takes ownership explicitly),
+      // so it has to be released here too or a 3D texture survives teardown.
+      lutTexture?.dispose();
+      lutTexture = null;
+
       composer = null;
       gtaoPass = null;
       smaaPass = null;

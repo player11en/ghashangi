@@ -35,6 +35,7 @@ import { createCameraPathPanel } from './ui/camera-path-panel.js';
 import { isClipRecordingSupported } from './core/recorder.js';
 import { createMaterialUndo } from './core/material-undo.js';
 import { FILM_PRESETS } from './core/passes/film-pass.js';
+import { parseLutFile } from './core/passes/lut-pass.js';
 import { logSessionStart, logExport, markStyleTouched, readTelemetry } from './core/telemetry.js';
 
 const $ = (id) => document.getElementById(id);
@@ -732,6 +733,7 @@ function syncStyleRows() {
   for (const [flag, selector] of [
     ['crtToggle', '[data-crt]'],
     ['bloomToggle', '[data-bloom]'],
+    ['lutToggle', '[data-lut]'],
     ['pixelateToggle', '[data-pixelate]'],
     ['glitchToggle', '[data-glitch]'],
     ['paletteToggle', '[data-palette]'],
@@ -791,13 +793,13 @@ function checkStyleCost() {
 // not drag-and-drop - keeps this keyboard/screen-reader accessible without
 // extra work, matching every other control in this app.
 const STYLE_LABELS = {
-  bloom: 'Bloom', colorGrade: 'Color grade', tone: 'Tone', pixelate: 'Pixelate',
+  bloom: 'Bloom', colorGrade: 'Color grade', lut: 'LUT', tone: 'Tone', pixelate: 'Pixelate',
   palette: 'Retro palette',
   halftone: 'Halftone / print', repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails',
   ascii: 'ASCII', crt: 'CRT', film: 'Film', glitch: 'Glitch',
 };
 const STYLE_TOGGLE_IDS = {
-  bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', tone: 'toneToggle',
+  bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', lut: 'lutToggle', tone: 'toneToggle',
   pixelate: 'pixelateToggle', palette: 'paletteToggle',
   halftone: 'halftoneToggle', repeat: 'repeatToggle', displace: 'displaceToggle',
   afterimage: 'afterimageToggle', ascii: 'asciiToggle', crt: 'crtToggle', film: 'filmToggle',
@@ -937,6 +939,52 @@ bindCheckbox('pixelateToggle', async (on) => {
 bindSlider('pixelateSize', (v) => viewer.post.setPixelateParam('pixelSize', v), (v) => `${v}px`);
 bindSlider('pixelateAspect', (v) => viewer.post.setPixelateParam('aspect', v), fixed2);
 bindSlider('pixelateGrid', (v) => viewer.post.setPixelateParam('gridStrength', v), fixed2);
+
+bindCheckbox('lutToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setLut(on);
+    renderStyleOrder();
+    if (on) checkStyleCost();
+  } catch (error) {
+    console.error('[Ghashangi] LUT failed to initialise', error);
+    toasts.error('Could not enable the LUT', String(error.message));
+    $('lutToggle').checked = false;
+    syncStyleRows();
+  }
+});
+
+$('lutPreset').addEventListener('change', (event) => {
+  viewer.post.setLutPreset(event.target.value);
+  $('lutHint').textContent =
+    'Built-in looks, or load a .cube / .3dl from Resolve, Premiere or a camera vendor.';
+});
+
+bindSlider('lutIntensity', (v) => viewer.post.setLutIntensity(v), fixed2);
+
+$('lutLoadButton').addEventListener('click', () => $('lutFile').click());
+
+$('lutFile').addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  // Cleared so picking the same file twice still fires a change event -
+  // otherwise re-loading an edited LUT silently does nothing.
+  event.target.value = '';
+  if (!file) return;
+
+  try {
+    const { texture, title } = await parseLutFile(file);
+    viewer.post.setLutTexture(texture);
+    $('lutHint').textContent = `Loaded ${title}`;
+    // A file overrides the preset, so leave the dropdown showing what is
+    // actually in force rather than a look that is no longer applied.
+    $('lutPreset').selectedIndex = -1;
+    if (!$('lutToggle').checked) $('lutToggle').click();
+  } catch (error) {
+    console.error('[Ghashangi] LUT file failed to parse', error);
+    toasts.error('Could not read that LUT', String(error.message));
+  }
+});
 
 bindSlider('bloomThreshold', (v) => viewer.post.setBloomThreshold(v), fixed2);
 bindSlider('bloomRadius', (v) => viewer.post.setBloomRadius(v), fixed2);

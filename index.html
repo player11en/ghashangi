@@ -534,6 +534,33 @@
           </div>
 
           <div class="row row-check">
+            <input type="checkbox" id="lutToggle">
+            <label for="lutToggle" title="Apply a colour lookup table, including .cube files from Resolve, Premiere or a camera vendor">LUT</label>
+          </div>
+          <div class="row" data-lut>
+            <label for="lutPreset">Look</label>
+            <select id="lutPreset">
+              <option value="teal_orange" selected>Teal &amp; orange</option>
+              <option value="bleach">Bleach bypass</option>
+              <option value="warm">Warm</option>
+              <option value="cool">Cool</option>
+              <option value="matrix">Green cast</option>
+            </select>
+          </div>
+          <div data-advanced class="row" data-lut>
+            <label for="lutIntensity">LUT amount</label>
+            <input type="range" id="lutIntensity" min="0" max="1" step="0.01" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="lutIntensityOut" value="1.00" aria-label="LUT intensity value">
+          </div>
+          <div data-advanced class="row row-buttons" data-lut>
+            <button type="button" id="lutLoadButton" class="button button-quiet">Load .cube file…</button>
+          </div>
+          <input type="file" id="lutFile" class="visually-hidden" accept=".cube,.3dl">
+          <p data-advanced class="hint" id="lutHint" data-lut>
+            Built-in looks, or load a .cube / .3dl from Resolve, Premiere or a camera vendor.
+          </p>
+
+          <div class="row row-check">
             <input type="checkbox" id="colorGradeToggle">
             <label for="colorGradeToggle">Color grade</label>
           </div>
