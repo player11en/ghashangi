@@ -49,6 +49,13 @@ export const LIGHT_DEFAULTS = {
   right: 2.1,
   exposure: 0.6,
   angle: 53, // degrees, drives the sun's position around the subject
+  // Colours were hardcoded at construction until now (a cool left fill, a warm
+  // right one - a conventional cross-lit product setup) with no way to change
+  // them. They live here so the rig, the UI's initial values and the settings
+  // reset all read the same source instead of three copies drifting apart.
+  sunColor: '#ffffff',
+  leftColor: '#b2b2ff',
+  rightColor: '#ff9898',
 };
 
 // RectAreaLightUniformsLib.init() uploads a shared BRDF lookup table. Doing it
@@ -85,7 +92,7 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
   const ambient = new AmbientLight(0xffffff, LIGHT_DEFAULTS.ambient);
   scene.add(ambient);
 
-  const sun = new DirectionalLight(0xffffff, LIGHT_DEFAULTS.sun);
+  const sun = new DirectionalLight(LIGHT_DEFAULTS.sunColor, LIGHT_DEFAULTS.sun);
   sun.castShadow = true;
   sun.shadow.mapSize.width = shadowMapSize;
   sun.shadow.mapSize.height = shadowMapSize;
@@ -106,10 +113,10 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
   scene.add(sunTarget);
   sun.target = sunTarget;
 
-  const left = new RectAreaLight(0xb2b2ff, LIGHT_DEFAULTS.left, 5, 5);
+  const left = new RectAreaLight(LIGHT_DEFAULTS.leftColor, LIGHT_DEFAULTS.left, 5, 5);
   scene.add(left);
 
-  const right = new RectAreaLight(0xff9898, LIGHT_DEFAULTS.right, 6, 6);
+  const right = new RectAreaLight(LIGHT_DEFAULTS.rightColor, LIGHT_DEFAULTS.right, 6, 6);
   scene.add(right);
 
   // Ground plane that catches shadows without being visible itself. Hidden by
@@ -222,6 +229,22 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
     },
     setRight(v) {
       right.intensity = v;
+      invalidate();
+    },
+
+    // Colour, not just brightness. invalidate(2) on the sun for the same
+    // reason setSun does: its colour reaches the shadow pass too.
+    setSunColor(hex) {
+      sun.color.set(hex);
+      requestShadowUpdate();
+      invalidate(2);
+    },
+    setLeftColor(hex) {
+      left.color.set(hex);
+      invalidate();
+    },
+    setRightColor(hex) {
+      right.color.set(hex);
       invalidate();
     },
     setAngle(degrees) {

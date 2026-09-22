@@ -16,8 +16,8 @@
 // leaves the canvas/render-target world the DOM approach abandons.
 //
 // Ramp order encodes a deliberate choice, not an arbitrary string: this
-// pass always composites to black wherever a glyph is "off" (see the
-// shader's `color = fg * glyph`), which is a phosphor-terminal look, not
+// pass composites to the background colour wherever a glyph is "off" -
+// black by default, which is a phosphor-terminal look, not
 // print-on-paper. So the default ramps run sparse-for-dark to dense-for-
 // bright (space for shadow, '@' for a highlight) - a bright source pixel
 // "lights up" more character, matching how a real terminal or CRT actually
@@ -40,37 +40,62 @@ precision highp float;
 uniform sampler2D tDiffuse;
 uniform sampler2D uFontAtlas;
 uniform vec2 uResolution;
-uniform float cellSize;
+// Width and height are independent: a monospace glyph is taller than it is
+// wide, so a square cell stretches every character. Separate axes are what
+// make real terminal proportions reachable at all.
+uniform float cellW;
+uniform float cellH;
+// How much of its cell a glyph fills. 1.0 = glyphs touch; below that they pull
+// apart, which is letter spacing rather than a smaller font.
+uniform float glyphFill;
 uniform float rampLength;
 uniform float colorize;
 uniform float invert;
+uniform float brightness;
+uniform float contrast;
+uniform vec3 bgColor;
 
 varying vec2 vUv;
 
 float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
 
 void main(){
+    vec2 cell = vec2(max(cellW, 1.0), max(cellH, 1.0));
     vec2 pixel = vUv * uResolution;
-    vec2 cellOrigin = floor(pixel / cellSize) * cellSize;
+    vec2 cellOrigin = floor(pixel / cell) * cell;
 
     // Luminance sampled once at the cell's center, not averaged across it -
     // the standard real-time-ASCII shortcut, and cheap enough to run every
     // frame at typical cell sizes without a separate downsample pass.
-    vec2 cellCenterUv = (cellOrigin + cellSize * 0.5) / uResolution;
+    vec2 cellCenterUv = (cellOrigin + cell * 0.5) / uResolution;
     vec3 srcColor = texture2D(tDiffuse, cellCenterUv).rgb;
 
+    // Remap luminance before picking a glyph. Without this, a contrast-heavy
+    // render collapses onto two or three characters and most of the ramp never
+    // appears at all.
     float l = luma(srcColor);
+    l = clamp((l - 0.5) * contrast + 0.5 + brightness, 0.0, 1.0);
     if (invert > 0.5) l = 1.0 - l;
     float charIndex = min(floor(l * rampLength), rampLength - 1.0);
 
-    vec2 withinCell = (pixel - cellOrigin) / cellSize;
+    vec2 withinCell = (pixel - cellOrigin) / cell;
+
+    // Shrink the glyph inside its cell, around the cell centre, and treat
+    // anything outside it as background - so spacing changes the gaps between
+    // characters without changing the grid they sit on.
+    vec2 g = (withinCell - 0.5) / max(glyphFill, 0.05) + 0.5;
+    if (g.x < 0.0 || g.x > 1.0 || g.y < 0.0 || g.y > 1.0) {
+      gl_FragColor = vec4(bgColor, 1.0);
+      return;
+    }
+
     // uFontAtlas has flipY disabled at upload (see buildFontAtlas) so this
     // maps directly to the canvas's own row order.
-    vec2 atlasUv = vec2((charIndex + withinCell.x) / rampLength, withinCell.y);
+    vec2 atlasUv = vec2((charIndex + g.x) / rampLength, g.y);
     float glyph = texture2D(uFontAtlas, atlasUv).r;
 
     vec3 fg = colorize > 0.5 ? srcColor : vec3(1.0);
-    gl_FragColor = vec4(fg * glyph, 1.0);
+    gl_FragColor = vec4(mix(bgColor, fg, glyph), 1.0);
 }
 `;
 
@@ -151,10 +176,18 @@ export function createAsciiShader() {
       tDiffuse: { value: null },
       uFontAtlas: { value: buildFontAtlas(ramp) },
       uResolution: { value: [1, 1] },
-      cellSize: { value: 12 },
+      // 8x14 rather than a square cell: glyphs are baked into square atlas
+      // cells, so a taller-than-wide screen cell compresses them into roughly
+      // terminal proportions instead of leaving them stretched.
+      cellW: { value: 8 },
+      cellH: { value: 14 },
+      glyphFill: { value: 1 },
       rampLength: { value: ramp.length },
       colorize: { value: 0 },
       invert: { value: 0 },
+      brightness: { value: 0 },
+      contrast: { value: 1 },
+      bgColor: { value: [0, 0, 0] },
     },
     vertexShader: asciiVertexShader,
     fragmentShader: asciiFragmentShader,

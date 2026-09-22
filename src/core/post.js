@@ -61,6 +61,7 @@ import { createColorGradeShader, setColorGradeStyle } from './passes/color-grade
 import { createToneShader, setToneMode } from './passes/tone-pass.js';
 import { createDisplaceShader, setDisplaceMode } from './passes/displace-pass.js';
 import { createAsciiShader, setAsciiRamp } from './passes/ascii-pass.js';
+import { createPixelateShader } from './passes/pixelate-pass.js';
 import { createHalftoneShader, setHalftoneMode } from './passes/halftone-pass.js';
 import { createFilmShader, applyFilmPreset } from './passes/film-pass.js';
 
@@ -106,8 +107,8 @@ async function loadModules() {
 // Bloom/CRT/Glitch kept their original relative slots as the default; the
 // five Track 5.3 additions land between Bloom and CRT, per the plan.
 const STYLE_KEYS = [
-  'bloom', 'colorGrade', 'tone', 'palette', 'halftone', 'repeat', 'displace', 'afterimage', 'ascii',
-  'crt', 'film', 'glitch',
+  'bloom', 'colorGrade', 'tone', 'pixelate', 'palette', 'halftone', 'repeat', 'displace',
+  'afterimage', 'ascii', 'crt', 'film', 'glitch',
 ];
 
 /**
@@ -126,8 +127,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   // variable each, since reorderStyle() needs to address them generically.
   const passes = {};
   const styleEnabled = {
-    bloom: false, colorGrade: false, tone: false, palette: false, halftone: false,
-    repeat: false, displace: false, afterimage: false, ascii: false,
+    bloom: false, colorGrade: false, tone: false, pixelate: false, palette: false,
+    halftone: false, repeat: false, displace: false, afterimage: false, ascii: false,
     crt: false, film: false, glitch: false,
   };
   let styleOrder = [...STYLE_KEYS];
@@ -237,6 +238,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     passes.bloom = new UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
     passes.colorGrade = new ShaderPass(createColorGradeShader());
     passes.tone = new ShaderPass(createToneShader());
+    passes.pixelate = new ShaderPass(createPixelateShader());
     passes.palette = new ShaderPass(createPaletteShader());
     passes.halftone = new ShaderPass(createHalftoneShader());
     passes.repeat = new ShaderPass(createRepeatShader());
@@ -321,6 +323,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     const pixelHeight = height * ratio;
     if (passes.crt) passes.crt.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.palette) passes.palette.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.pixelate) passes.pixelate.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.tone) passes.tone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.ascii) passes.ascii.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.halftone) passes.halftone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
@@ -626,6 +629,17 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     },
 
     // --- print reproduction + film emulation -----------------------------
+
+    // Standalone pixelation - the same block resample the retro palette does
+    // internally, but usable without also quantizing to a console palette.
+    setPixelate(enabled) {
+      return setStyleEnabled('pixelate', enabled);
+    },
+
+    setPixelateParam(name, value) {
+      if (passes.pixelate?.uniforms[name]) passes.pixelate.uniforms[name].value = value;
+      invalidate(2);
+    },
 
     setHalftone(enabled) {
       return setStyleEnabled('halftone', enabled);

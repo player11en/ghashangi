@@ -468,6 +468,38 @@ export function createViewer({ container }) {
     loop.invalidate();
   }
 
+  // The stage's appearance is a user setting, not a property of Stage.glb, so
+  // it is held here and re-applied on every install - otherwise loading a new
+  // model would quietly reset the backdrop to the file's authored white while
+  // the panel still showed the chosen colour.
+  // Each of these applies only once the user has actually asked for it.
+  // bindSlider() in main.js calls its apply() once at wiring time to sync the
+  // readout, and a colour input carries a default value whether or not anyone
+  // touched it - so applying unconditionally would overwrite whatever
+  // Stage.glb authored with this app's guesses on every single load. That is
+  // exactly the bug DOF's focus seeding hit (see post.js's
+  // markDofFocusTouched), so it uses the same explicit-intent flag here.
+  let stageColor = '#ffffff';
+  let stageRoughness = 0.9;
+  let stageColorTouched = false;
+  let stageRoughnessTouched = false;
+
+  function applyStageAppearance() {
+    const stage = stageRoot.children[0];
+    if (!stage) return;
+    stage.traverse((node) => {
+      if (!node.isMesh) return;
+      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+        if (!material) continue;
+        if (stageColorTouched) material.color?.set(stageColor);
+        if (stageRoughnessTouched && material.roughness !== undefined) {
+          material.roughness = stageRoughness;
+        }
+      }
+    });
+    lights.requestShadowUpdate();
+  }
+
   /** Install the decorative stage, scaled to the current subject. */
   function setStage(object) {
     disposeObject(stageRoot.children[0] ?? null, {
@@ -478,6 +510,7 @@ export function createViewer({ container }) {
     });
     stageRoot.add(object);
     fitStage();
+    applyStageAppearance();
     loop.invalidate();
   }
 
@@ -887,6 +920,7 @@ export function createViewer({ container }) {
         post.setBloom(false);
         post.setGlitch(false);
         post.setCrt(false);
+        post.setPixelate(false);
         post.setPalette(false);
         post.setColorGrade(false);
         post.setTone(false);
@@ -901,6 +935,25 @@ export function createViewer({ container }) {
     setStageVisible(visible) {
       stageRoot.visible = visible;
       loop.invalidate();
+    },
+    // A colour input only fires on real interaction, so this is always
+    // explicit intent - unlike setStageRoughness below.
+    setStageColor(hex) {
+      stageColor = hex;
+      stageColorTouched = true;
+      applyStageAppearance();
+      loop.invalidate(2);
+    },
+    setStageRoughness(value) {
+      stageRoughness = value;
+      if (stageRoughnessTouched) applyStageAppearance();
+      loop.invalidate(2);
+    },
+    /** Called only from a real 'input' event - see applyStageAppearance. */
+    markStageRoughnessTouched() {
+      stageRoughnessTouched = true;
+      applyStageAppearance();
+      loop.invalidate(2);
     },
     isStageVisible() {
       return stageRoot.visible;

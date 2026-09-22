@@ -442,7 +442,22 @@ function hexToRgbArray(hex) {
 bindSlider('scaleSlider', (v) => viewer.setScale(v), (v) => `${v.toFixed(2)}×`);
 bindSlider('heightSlider', (v) => viewer.setHeight(v), fixed1);
 bindCheckbox('autoRotate', (on) => viewer.setAutoRotate(on));
-bindCheckbox('stageToggle', (on) => viewer.setStageVisible(on));
+bindCheckbox('stageToggle', (on) => {
+  viewer.setStageVisible(on);
+  syncStageRows();
+});
+$('stageColor').addEventListener('input', (e) => viewer.setStageColor(e.target.value));
+bindSlider('stageRoughness', (v) => viewer.setStageRoughness(v), fixed2);
+// Separate from the setter above so bindSlider's wiring-time apply() cannot
+// count as the user asking to override Stage.glb's authored material.
+$('stageRoughness').addEventListener('input', () => viewer.markStageRoughnessTouched());
+
+/** Stage appearance only means anything while the stage is actually shown. */
+function syncStageRows() {
+  const on = $('stageToggle').checked;
+  for (const row of document.querySelectorAll('[data-stage]')) row.hidden = !on;
+}
+syncStageRows();
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
@@ -526,6 +541,11 @@ bindSlider('sunSlider', (v) => viewer.lights.setSun(v), fixed2);
 bindSlider('leftSlider', (v) => viewer.lights.setLeft(v), fixed1);
 bindSlider('rightSlider', (v) => viewer.lights.setRight(v), fixed1);
 bindSlider('angleSlider', (v) => viewer.lights.setAngle(v), (v) => `${Math.round(v)}°`);
+// three's Color.set() takes an '#rrggbb' string directly, so these need no
+// hexToRgbArray() conversion - that helper is for raw shader uniforms.
+$('sunColor').addEventListener('input', (e) => viewer.lights.setSunColor(e.target.value));
+$('leftColor').addEventListener('input', (e) => viewer.lights.setLeftColor(e.target.value));
+$('rightColor').addEventListener('input', (e) => viewer.lights.setRightColor(e.target.value));
 bindCheckbox('shadowToggle', (on) => viewer.setShadowsEnabled(on));
 
 // Environment
@@ -619,6 +639,7 @@ function syncStyleRows() {
   for (const [flag, selector] of [
     ['crtToggle', '[data-crt]'],
     ['bloomToggle', '[data-bloom]'],
+    ['pixelateToggle', '[data-pixelate]'],
     ['glitchToggle', '[data-glitch]'],
     ['paletteToggle', '[data-palette]'],
     ['colorGradeToggle', '[data-colorgrade]'],
@@ -677,12 +698,14 @@ function checkStyleCost() {
 // not drag-and-drop - keeps this keyboard/screen-reader accessible without
 // extra work, matching every other control in this app.
 const STYLE_LABELS = {
-  bloom: 'Bloom', colorGrade: 'Color grade', tone: 'Tone', palette: 'Retro palette',
+  bloom: 'Bloom', colorGrade: 'Color grade', tone: 'Tone', pixelate: 'Pixelate',
+  palette: 'Retro palette',
   halftone: 'Halftone / print', repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails',
   ascii: 'ASCII', crt: 'CRT', film: 'Film', glitch: 'Glitch',
 };
 const STYLE_TOGGLE_IDS = {
-  bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', tone: 'toneToggle', palette: 'paletteToggle',
+  bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', tone: 'toneToggle',
+  pixelate: 'pixelateToggle', palette: 'paletteToggle',
   halftone: 'halftoneToggle', repeat: 'repeatToggle', displace: 'displaceToggle',
   afterimage: 'afterimageToggle', ascii: 'asciiToggle', crt: 'crtToggle', film: 'filmToggle',
   glitch: 'glitchToggle',
@@ -772,6 +795,30 @@ bindCheckbox('bloomToggle', async (on) => {
   }
 });
 bindSlider('bloomStrength', (v) => viewer.post.setBloomStrength(v), fixed2);
+// setBloomThreshold/setBloomRadius existed in post.js from the day bloom
+// shipped and were wired to nothing, so threshold sat at 0.7 permanently -
+// the actual reason "turn every light up and enable bloom" blew the whole
+// frame out with no way to pull it back.
+bindCheckbox('pixelateToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setPixelate(on);
+    renderStyleOrder();
+    if (on) checkStyleCost();
+  } catch (error) {
+    console.error('[Ghashangi] pixelate failed to initialise', error);
+    toasts.error('Could not enable pixelate', String(error.message));
+    $('pixelateToggle').checked = false;
+    syncStyleRows();
+  }
+});
+bindSlider('pixelateSize', (v) => viewer.post.setPixelateParam('pixelSize', v), (v) => `${v}px`);
+bindSlider('pixelateAspect', (v) => viewer.post.setPixelateParam('aspect', v), fixed2);
+bindSlider('pixelateGrid', (v) => viewer.post.setPixelateParam('gridStrength', v), fixed2);
+
+bindSlider('bloomThreshold', (v) => viewer.post.setBloomThreshold(v), fixed2);
+bindSlider('bloomRadius', (v) => viewer.post.setBloomRadius(v), fixed2);
 
 bindCheckbox('glitchToggle', async (on) => {
   markStyleTouched();
@@ -1016,7 +1063,19 @@ $('asciiRamp').addEventListener('change', (event) => {
 $('asciiCustomRamp').addEventListener('change', (event) => {
   if ($('asciiRamp').value === 'custom') viewer.post.setAsciiRamp('custom', event.target.value);
 });
-bindSlider('asciiCellSize', (v) => viewer.post.setAsciiParam('cellSize', v), (v) => `${v}px`);
+// Width and height are separate because a monospace glyph is not square:
+// one "cell size" slider could only ever stretch the character set.
+bindSlider('asciiCellW', (v) => viewer.post.setAsciiParam('cellW', v), (v) => `${v}px`);
+bindSlider('asciiCellH', (v) => viewer.post.setAsciiParam('cellH', v), (v) => `${v}px`);
+// Exposed as "spacing" (0 = letters touch) but sent as glyphFill (1 = fill the
+// cell), because "more spacing" is the intuitive direction for a slider and
+// "how much of the cell the glyph covers" is the useful direction for a shader.
+bindSlider('asciiSpacing', (v) => viewer.post.setAsciiParam('glyphFill', 1 - v), fixed2);
+bindSlider('asciiContrast', (v) => viewer.post.setAsciiParam('contrast', v), fixed2);
+bindSlider('asciiBrightness', (v) => viewer.post.setAsciiParam('brightness', v), fixed2);
+$('asciiBgColor').addEventListener('input', (e) => {
+  viewer.post.setAsciiParam('bgColor', hexToRgbArray(e.target.value));
+});
 bindCheckbox('asciiColorize', (on) => viewer.post.setAsciiParam('colorize', on ? 1 : 0));
 bindCheckbox('asciiInvert', (on) => viewer.post.setAsciiParam('invert', on ? 1 : 0));
 

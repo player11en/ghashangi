@@ -110,6 +110,15 @@
           <input type="checkbox" id="stageToggle" checked>
           <label for="stageToggle">Show stage</label>
         </div>
+        <div class="row" data-stage>
+          <label for="stageColor">Stage color</label>
+          <input type="color" id="stageColor" value="#ffffff">
+        </div>
+        <div class="row" data-stage>
+          <label for="stageRoughness">Stage roughness</label>
+          <input type="range" id="stageRoughness" min="0" max="1" step="0.05" value="0.9">
+          <input type="text" inputmode="decimal" class="value-input" id="stageRoughnessOut" value="0.90" aria-label="Stage roughness value">
+        </div>
         <div class="row row-check">
           <input type="checkbox" id="wireframe">
           <label for="wireframe" title="Shortcut: W">Wireframe</label>
@@ -280,14 +289,26 @@
           <input type="text" inputmode="decimal" class="value-input" id="sunOut" value="1.80" aria-label="Sun light value">
         </div>
         <div class="row">
+          <label for="sunColor">Sun color</label>
+          <input type="color" id="sunColor" value="#ffffff">
+        </div>
+        <div class="row">
           <label for="leftSlider">Left fill</label>
           <input type="range" id="leftSlider" min="0" max="30" step="0.1" value="4.5">
           <input type="text" inputmode="decimal" class="value-input" id="leftOut" value="4.5" aria-label="Left fill light value">
         </div>
         <div class="row">
+          <label for="leftColor">Left fill color</label>
+          <input type="color" id="leftColor" value="#b2b2ff">
+        </div>
+        <div class="row">
           <label for="rightSlider">Right fill</label>
           <input type="range" id="rightSlider" min="0" max="30" step="0.1" value="2.1">
           <input type="text" inputmode="decimal" class="value-input" id="rightOut" value="2.1" aria-label="Right fill light value">
+        </div>
+        <div class="row">
+          <label for="rightColor">Right fill color</label>
+          <input type="color" id="rightColor" value="#ff9898">
         </div>
         <div class="row">
           <label for="angleSlider">Sun angle</label>
@@ -420,6 +441,24 @@
           <input type="range" id="bloomStrength" min="0" max="2" step="0.05" value="0.6">
           <input type="text" inputmode="decimal" class="value-input" id="bloomStrengthOut" value="0.60" aria-label="Bloom strength value">
         </div>
+        <!-- Threshold is the control that decides WHAT glows, and without it
+             bloom reads as "the whole image is blown out": every pixel above
+             0.7 luminance blooms and the only available response is dimming
+             strength, which also dims the highlights that should bloom. -->
+        <div class="row" data-bloom>
+          <label for="bloomThreshold">Bloom threshold</label>
+          <input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.7">
+          <input type="text" inputmode="decimal" class="value-input" id="bloomThresholdOut" value="0.70" aria-label="Bloom threshold value">
+        </div>
+        <div class="row" data-bloom>
+          <label for="bloomRadius">Bloom radius</label>
+          <input type="range" id="bloomRadius" min="0" max="1" step="0.05" value="0.4">
+          <input type="text" inputmode="decimal" class="value-input" id="bloomRadiusOut" value="0.40" aria-label="Bloom radius value">
+        </div>
+        <p class="hint" data-bloom>
+          Raise the threshold so only genuinely bright areas glow; lower it to
+          bloom the whole frame.
+        </p>
         <div class="row row-check">
           <input type="checkbox" id="glitchToggle">
           <label for="glitchToggle">Glitch</label>
@@ -427,6 +466,25 @@
         <div class="row row-check" data-glitch>
           <input type="checkbox" id="glitchWild">
           <label for="glitchWild">Wild mode</label>
+        </div>
+        <div class="row row-check">
+          <input type="checkbox" id="pixelateToggle">
+          <label for="pixelateToggle">Pixelate</label>
+        </div>
+        <div class="row" data-pixelate>
+          <label for="pixelateSize">Pixel size</label>
+          <input type="range" id="pixelateSize" min="2" max="48" step="1" value="6">
+          <input type="text" inputmode="numeric" class="value-input" id="pixelateSizeOut" value="6px" aria-label="Pixel size">
+        </div>
+        <div class="row" data-pixelate>
+          <label for="pixelateAspect">Pixel aspect</label>
+          <input type="range" id="pixelateAspect" min="0.25" max="4" step="0.05" value="1">
+          <input type="text" inputmode="decimal" class="value-input" id="pixelateAspectOut" value="1.00" aria-label="Pixel aspect ratio">
+        </div>
+        <div class="row" data-pixelate>
+          <label for="pixelateGrid">Grid lines</label>
+          <input type="range" id="pixelateGrid" min="0" max="1" step="0.05" value="0">
+          <input type="text" inputmode="decimal" class="value-input" id="pixelateGridOut" value="0.00" aria-label="Pixel grid strength">
         </div>
         <div class="row row-check">
           <input type="checkbox" id="paletteToggle">
@@ -611,9 +669,33 @@
           <input type="text" id="asciiCustomRamp" placeholder=" .:-=+*#%@" maxlength="32">
         </div>
         <div class="row" data-ascii>
-          <label for="asciiCellSize">Cell size</label>
-          <input type="range" id="asciiCellSize" min="4" max="32" step="1" value="12">
-          <output for="asciiCellSize" id="asciiCellSizeOut">12px</output>
+          <label for="asciiCellW">Letter width</label>
+          <input type="range" id="asciiCellW" min="3" max="40" step="1" value="8">
+          <input type="text" inputmode="numeric" class="value-input" id="asciiCellWOut" value="8px" aria-label="ASCII letter width">
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiCellH">Letter height</label>
+          <input type="range" id="asciiCellH" min="4" max="48" step="1" value="14">
+          <input type="text" inputmode="numeric" class="value-input" id="asciiCellHOut" value="14px" aria-label="ASCII letter height">
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiSpacing">Letter spacing</label>
+          <input type="range" id="asciiSpacing" min="0" max="0.7" step="0.02" value="0">
+          <input type="text" inputmode="decimal" class="value-input" id="asciiSpacingOut" value="0.00" aria-label="ASCII letter spacing">
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiContrast">Contrast</label>
+          <input type="range" id="asciiContrast" min="0.4" max="3" step="0.05" value="1">
+          <input type="text" inputmode="decimal" class="value-input" id="asciiContrastOut" value="1.00" aria-label="ASCII contrast">
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiBrightness">Brightness</label>
+          <input type="range" id="asciiBrightness" min="-0.5" max="0.5" step="0.02" value="0">
+          <input type="text" inputmode="decimal" class="value-input" id="asciiBrightnessOut" value="0.00" aria-label="ASCII brightness">
+        </div>
+        <div class="row" data-ascii>
+          <label for="asciiBgColor">Background</label>
+          <input type="color" id="asciiBgColor" value="#000000">
         </div>
         <div class="row row-check" data-ascii>
           <input type="checkbox" id="asciiColorize">
