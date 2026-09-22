@@ -567,6 +567,37 @@
             <input type="text" inputmode="decimal" class="value-input" id="pixelateGridOut" value="0.00" aria-label="Pixel grid strength">
           </div>
           <div class="row row-check">
+            <input type="checkbox" id="ditherToggle">
+            <label for="ditherToggle" title="Ordered dithering on its own, without the retro palette's fixed colours">Dither</label>
+          </div>
+          <div class="row" data-dither>
+            <label for="ditherMatrix">Pattern</label>
+            <select id="ditherMatrix">
+              <option value="4" selected>Bayer 4×4</option>
+              <option value="8">Bayer 8×8 (finer)</option>
+            </select>
+          </div>
+          <div class="row" data-dither data-advanced>
+            <label for="ditherLevels">Levels</label>
+            <input type="range" id="ditherLevels" min="2" max="16" step="1" value="4">
+            <input type="text" inputmode="numeric" class="value-input" id="ditherLevelsOut" value="4" aria-label="Dither levels per channel">
+          </div>
+          <div class="row" data-dither data-advanced>
+            <label for="ditherScale">Dot size</label>
+            <input type="range" id="ditherScale" min="1" max="8" step="1" value="1">
+            <input type="text" inputmode="numeric" class="value-input" id="ditherScaleOut" value="1px" aria-label="Dither dot size">
+          </div>
+          <div class="row" data-dither data-advanced>
+            <label for="ditherAmount">Amount</label>
+            <input type="range" id="ditherAmount" min="0" max="1" step="0.02" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="ditherAmountOut" value="1.00" aria-label="Dither amount">
+          </div>
+          <div class="row row-check" data-dither data-advanced>
+            <input type="checkbox" id="ditherMono">
+            <label for="ditherMono">Monochrome</label>
+          </div>
+
+          <div class="row row-check">
             <input type="checkbox" id="paletteToggle">
             <label for="paletteToggle">Retro palette</label>
           </div>

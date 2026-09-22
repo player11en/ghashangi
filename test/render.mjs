@@ -480,6 +480,42 @@ await page.evaluate(async () => { await window.__viewer.post.setAscii(false); })
 await page.evaluate(async () => { await window.__viewer.post.setHalftone(true); });
 await settle();
 const halftoneDots = await viewportHash();
+// Standalone dither (Phase 9). Dithering existed only inside palette-pass.js,
+// welded to pixelation and a fixed console palette. This is the same technique
+// with a plain level count instead, which reaches the 1-bit/newsprint territory
+// the palette pass cannot.
+await page.evaluate(async () => { await window.__viewer.post.setDither(true); });
+await settle(800);
+const dither4 = await viewportHash();
+check('Dither changes the rendered image', dither4 !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setDitherParam('matrixSize', 8));
+await settle();
+check('Bayer 8x8 differs from 4x4', (await viewportHash()) !== dither4);
+
+await page.evaluate(() => {
+  const p = window.__viewer.post;
+  p.setDitherParam('matrixSize', 4);
+  p.setDitherParam('levels', 2);
+});
+await settle();
+check('Dither levels is a real dial', (await viewportHash()) !== dither4);
+
+await page.evaluate(() => {
+  const p = window.__viewer.post;
+  p.setDitherParam('levels', 4);
+  p.setDitherParam('monochrome', 1);
+});
+await settle();
+check('Dither monochrome differs from colour', (await viewportHash()) !== dither4);
+
+await page.evaluate(async () => {
+  const p = window.__viewer.post;
+  p.setDitherParam('monochrome', 0);
+  await p.setDither(false);
+});
+await settle();
+
 // Voronoi (Phase 9). One cell shader, three readings of the same
 // nearest-site answer: paint the cell, draw its boundary, or displace it.
 await page.evaluate(async () => { await window.__viewer.post.setVoronoi(true); });

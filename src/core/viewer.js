@@ -927,6 +927,7 @@ export function createViewer({ container }) {
         post.setCrt(false);
         post.setPixelate(false);
         post.setLut(false);
+        post.setDither(false);
         post.setVoronoi(false);
         post.setKuwahara(false);
         post.setPalette(false);

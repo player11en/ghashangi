@@ -735,6 +735,7 @@ function syncStyleRows() {
     ['bloomToggle', '[data-bloom]'],
     ['lutToggle', '[data-lut]'],
     ['voronoiToggle', '[data-voronoi]'],
+    ['ditherToggle', '[data-dither]'],
     ['kuwaharaToggle', '[data-kuwahara]'],
     ['pixelateToggle', '[data-pixelate]'],
     ['glitchToggle', '[data-glitch]'],
@@ -796,14 +797,14 @@ function checkStyleCost() {
 // extra work, matching every other control in this app.
 const STYLE_LABELS = {
   bloom: 'Bloom', colorGrade: 'Color grade', lut: 'LUT', tone: 'Tone',
-  kuwahara: 'Painterly', voronoi: 'Voronoi', pixelate: 'Pixelate',
+  kuwahara: 'Painterly', voronoi: 'Voronoi', pixelate: 'Pixelate', dither: 'Dither',
   palette: 'Retro palette',
   halftone: 'Halftone / print', repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails',
   ascii: 'ASCII', crt: 'CRT', film: 'Film', glitch: 'Glitch',
 };
 const STYLE_TOGGLE_IDS = {
   bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', lut: 'lutToggle', tone: 'toneToggle',
-  kuwahara: 'kuwaharaToggle', voronoi: 'voronoiToggle',
+  kuwahara: 'kuwaharaToggle', voronoi: 'voronoiToggle', dither: 'ditherToggle',
   pixelate: 'pixelateToggle', palette: 'paletteToggle',
   halftone: 'halftoneToggle', repeat: 'repeatToggle', displace: 'displaceToggle',
   afterimage: 'afterimageToggle', ascii: 'asciiToggle', crt: 'crtToggle', film: 'filmToggle',
@@ -965,6 +966,28 @@ bindSlider('voronoiShatter', (v) => viewer.post.setVoronoiParam('shatter', v), f
 $('voronoiEdgeColor').addEventListener('input', (e) => {
   viewer.post.setVoronoiParam('edgeColor', hexToRgbArray(e.target.value));
 });
+
+bindCheckbox('ditherToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setDither(on);
+    renderStyleOrder();
+    if (on) checkStyleCost();
+  } catch (error) {
+    console.error('[Ghashangi] dither failed to initialise', error);
+    toasts.error('Could not enable Dither', String(error.message));
+    $('ditherToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('ditherMatrix').addEventListener('change', (e) => {
+  viewer.post.setDitherParam('matrixSize', parseFloat(e.target.value));
+});
+bindSlider('ditherLevels', (v) => viewer.post.setDitherParam('levels', v), (v) => String(v));
+bindSlider('ditherScale', (v) => viewer.post.setDitherParam('scale', v), (v) => `${v}px`);
+bindSlider('ditherAmount', (v) => viewer.post.setDitherParam('strength', v), fixed2);
+bindCheckbox('ditherMono', (on) => viewer.post.setDitherParam('monochrome', on ? 1 : 0));
 
 bindCheckbox('kuwaharaToggle', async (on) => {
   markStyleTouched();
