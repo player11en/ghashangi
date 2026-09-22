@@ -126,6 +126,54 @@ Phase 9.
 
 ---
 
+## Phase 8.5 — Progressive disclosure, not a Pro mode
+
+119 controls exist now, and every future phase adds more. The question of how
+to keep that from burying a first-time user came up as "split the app into
+Open and Pro", and the answer landed on **one interface with an Advanced
+reveal** instead. Recorded with the reasoning because the panel-split question
+has now been asked three times, and a fourth time should start from here
+rather than from scratch.
+
+**What gets built.** Each control carries a `data-advanced` flag. One switch in
+the panel header toggles it. Off, the panel shows roughly the forty controls
+that matter for "open a model and make it look good" across the same five
+tabs. On, it shows everything. The timeline from Phase 10 lands as a
+collapsed-by-default section either way, because it genuinely is a large
+surface — but collapsed is not the same thing as a separate application.
+
+**The rule that makes it safe: a control changed from its default stays
+visible even with Advanced off.** Nothing that is actively affecting the
+render is ever hidden. That single rule is what a mode split cannot offer, and
+it is the deciding argument, not a refinement:
+
+- A timeline built in a Pro mode keeps animating the output after switching to
+  Open, while being unreachable and invisible. There is no way to discover why
+  the render is moving.
+- This project already reverted one feature for exactly that failure — the
+  tier auto-downgrade silently unchecked a user's own AO and Style toggles
+  during an ordinary slowdown. Hidden state changing visible output, with no
+  explanation available, is a bug class this codebase has decided against
+  once already.
+
+**The costs a mode split also carries**, worth having written down:
+
+- Every future feature gains a recurring "Open or Pro?" placement decision -
+  a tax on every addition, paid forever, resolved by guesswork.
+- Features in Pro become undiscoverable. The person most likely to benefit
+  from learning them is the one who never opens that mode.
+- The test suite currently asserts every section lives on exactly one tab. Two
+  modes means two layouts to verify, doubling the UI surface under test.
+- It is hard to un-split. Collapsing a disclosure back down is easy; merging
+  two shells that have drifted apart is not.
+
+**What stays true from the original decision.** One app, one engine, one
+export path, one URL, no audience switch. An Advanced reveal is the same shape
+as the tab grouping already shipped: it changes how much is on screen, not
+what the app is or who it is for.
+
+---
+
 ## Phase 9 — Effects expansion
 
 New passes in the same "one pass, one toggle, a mode dropdown for variants"
@@ -312,7 +360,9 @@ one:
 - **Opening it has to stay free.** 119 controls now exist, and the defence
   against that is not restraint in what gets added — it is that every one of
   them defaults to off or to the shipped value, so dropping a file still gets
-  a framed, lit, good-looking render with zero clicks. Any feature that has to
+  a framed, lit, good-looking render with zero clicks. Depth is reached by
+  revealing more of the same panel (Phase 8.5), never by switching into a
+  different one. Any feature that has to
   be configured before the app is useful breaks the only real advantage this
   has over Marmoset or KeyShot. The timeline in Phase 10 is the first item on
   this list with a serious chance of breaking that rule, which is why it stays
