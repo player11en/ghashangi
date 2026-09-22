@@ -548,7 +548,9 @@ $('resetSettings').addEventListener('click', () => {
   const ok = window.confirm(
     'Reset all settings to defaults?\n\n'
     + 'Lighting, Style effects, fidelity and quality go back to how the app '
-    + 'shipped. Your model stays loaded, and saved colourways are kept.',
+    + 'shipped.\n\n'
+    + 'Not affected: the loaded model, its scale, height and rotation, and your '
+    + 'saved colourways. Those have their own reset buttons.',
   );
   if (!ok) return;
 
