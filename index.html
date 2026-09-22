@@ -589,6 +589,42 @@
             <input type="text" inputmode="decimal" class="value-input" id="pixelateGridOut" value="0.00" aria-label="Pixel grid strength">
           </div>
           <div class="row row-check">
+            <input type="checkbox" id="pixelSortToggle">
+            <label for="pixelSortToggle" title="Sorts pixels by brightness within a window. Costly — reduce the run length if the frame rate drops.">Pixel sort</label>
+          </div>
+          <div class="row" data-pixelsort>
+            <label for="pixelSortAxis">Direction</label>
+            <select id="pixelSortAxis">
+              <option value="0" selected>Horizontal</option>
+              <option value="1">Vertical</option>
+            </select>
+          </div>
+          <div class="row" data-pixelsort data-advanced>
+            <label for="pixelSortWindow">Run length</label>
+            <input type="range" id="pixelSortWindow" min="4" max="48" step="2" value="24">
+            <input type="text" inputmode="numeric" class="value-input" id="pixelSortWindowOut" value="24px" aria-label="Pixel sort run length">
+          </div>
+          <div class="row" data-pixelsort data-advanced>
+            <label for="pixelSortLow">Dark cutoff</label>
+            <input type="range" id="pixelSortLow" min="0" max="1" step="0.02" value="0.25">
+            <input type="text" inputmode="decimal" class="value-input" id="pixelSortLowOut" value="0.25" aria-label="Pixel sort dark cutoff">
+          </div>
+          <div class="row" data-pixelsort data-advanced>
+            <label for="pixelSortHigh">Light cutoff</label>
+            <input type="range" id="pixelSortHigh" min="0" max="1" step="0.02" value="0.8">
+            <input type="text" inputmode="decimal" class="value-input" id="pixelSortHighOut" value="0.80" aria-label="Pixel sort light cutoff">
+          </div>
+          <div class="row row-check" data-pixelsort data-advanced>
+            <input type="checkbox" id="pixelSortReverse">
+            <label for="pixelSortReverse">Reverse</label>
+          </div>
+          <p class="hint" data-pixelsort data-advanced>
+            Only pixels between the two cutoffs are sorted, which is what tears
+            bands out of the image instead of smearing all of it. Runs stop at
+            the run length rather than crossing the whole frame.
+          </p>
+
+          <div class="row row-check">
             <input type="checkbox" id="ditherToggle">
             <label for="ditherToggle" title="Ordered dithering on its own, without the retro palette's fixed colours">Dither</label>
           </div>

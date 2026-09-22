@@ -17,8 +17,8 @@ known gap, it says so, and says why it has not been closed yet.
 | **Materials** | Per-material colour with a texture-preserving blend dial, metalness, roughness, emissive, opacity, undo/redo |
 | **Colourways** | Named material sets, per-model persistence, batch PNG export as a zip, GLB export |
 | **Lighting** | Five-light rig, shadows, AgX/ACES/Neutral tone mapping, HDR environment with rotation and intensity |
-| **Fidelity** | GTAO ambient occlusion, SMAA, depth of field — each lazily loaded, each with a pixel-exact off state |
-| **Style** | 13 reorderable stylization passes: CRT, film, retro palette, pixelate, ASCII, halftone, bloom, glitch, trails, colour grade, tone, repeat, displace |
+| **Fidelity** | GTAO ambient occlusion, SMAA, depth of field, silhouette outline — each lazily loaded, each with a pixel-exact off state |
+| **Style** | 17 reorderable stylization passes: CRT, film, retro palette, pixelate, dither, ASCII, halftone, bloom, glitch, trails, colour grade, LUT, tone, repeat, displace, Voronoi, painterly, pixel sort |
 | **Animation** | Clip list, transport, scrub, speed, loop |
 | **Output** | Screenshots to 4x with optional transparency, turntable WebM, camera-path clips with 9:16 / 1:1 aspect lock |
 | **Performance** | On-demand rendering (0 fps at rest), device capability tiers, dense-model triangle budget, ~1.4 MB first load |
@@ -223,26 +223,67 @@ what the app is or who it is for.
 
 ---
 
-## Phase 9 — Effects expansion
+## Phase 9 — Effects expansion — **SHIPPED**
 
-New passes in the same "one pass, one toggle, a mode dropdown for variants"
-shape the existing twelve already follow.
+Six additions, taking the Style chain from 13 passes to 17 plus a new
+fidelity-band pass. Every one keeps the established shape: one toggle, a
+mode or preset dropdown where there are variants, numeric parameters behind
+the Advanced reveal, forced off on the low tier, and a pixel-exact image when
+switched back off.
 
-- **Voronoi / cellular** — shatter, stained-glass and mosaic looks from one
-  cell-hash shader. Genuinely unlike anything currently in the chain.
-- **Kuwahara** — the painterly/oil-paint filter. Distinctive, well
-  documented, strong fit for abstract output.
-- **Pixel sort** — rated worth building two planning rounds ago and still not
-  built. The signature glitch-art technique, and the most expensive item
-  here: it needs a real bitonic-style GPU sort, not a per-pixel shader trick.
-- **Outline / toon** — `OutlinePass` ships with three and is unused. Cheap.
-- **Real LUT files.** `LUTPass` ships with three, unused. Loading `.cube`
-  files means the grade a colourist actually hands over, rather than only the
-  brightness/contrast/hue maths the colour-grade pass does today. The closest
-  thing on this list to a professional-tool feature.
-- **More depth on what exists** — standalone chromatic aberration (reachable
-  only inside CRT right now), and a standalone dither to finish the split that
-  pixelate already got.
+**Real LUT grading.** three ships `LUTPass` and three LUT loaders and none had
+been used. Five generated presets so the toggle does something immediately,
+plus `.cube` and `.3dl` file loading — the format Resolve, Premiere and camera
+vendors export, which is the difference between having colour sliders and
+accepting the same grade as the rest of a pipeline. The colour-grade pass
+stays: live maths is what you want while dialling a look in, a fixed table is
+what you want when someone else authored it.
+
+**Voronoi** — mosaic, stained glass and shatter from one cell shader. Sites
+come from hashing the integer grid and searching the 3x3 neighbourhood, which
+keeps it a single pass with no buffers where a true N-site diagram would need
+a nearest-neighbour search.
+
+**Painterly (Kuwahara)** — edge-preserving smoothing, which is why it reads as
+brushwork rather than blur. Honest limitation: it needs texture detail to have
+anything to turn into strokes, so it is mild on a clean product render and
+much stronger on photographic or detailed geometry.
+
+**Standalone dither** — finishes the split pixelate got earlier in the phase.
+Quantizes to a level count rather than fixed console colours, so it reaches
+1-bit and newsprint territory the palette pass structurally cannot. Bayer 8x8
+is derived from the 4x4 by the standard recursive rule rather than typed out
+twice.
+
+**Outline** — in the fidelity band with AO/AA/DOF, not the Style chain,
+because it re-renders the silhouette from the real scene and that scene is
+gone once a Style pass has rewritten the image. Reaches what Sobel edges
+cannot: a light model on a light backdrop has no luminance contrast, but still
+has a silhouette.
+
+**Pixel sort** — and worth being precise, because the name usually means
+something slightly different. The classic technique sorts arbitrarily long
+runs, which on a GPU needs multi-pass bitonic sorting with ping-pong buffers.
+This is a *window-limited* sort: within the window pixels are genuinely ranked
+by luminance via binary search on value (eight steps, O(8n) rather than
+O(n^2)), so it is a real sort and not a smear standing in for one. The visible
+difference is that streaks stop at the run length instead of crossing the
+frame. Same honest caveat as Painterly — smooth content is already in sorted
+order, so it shows on detail and noise, and pairs well after another pass.
+
+Two recurring lessons, both now paid for three times over:
+
+- **`post.js` has two places that destructure the lazily loaded modules.**
+  Adding a pass means touching both, and forgetting shows up only at runtime.
+  `BokehPass`, `LUTPass` and `OutlinePass` each hit this; the third one also
+  knocked `GlitchPass` off the line it was inserted into.
+- **Syntax-check generated test files before running them.** A mis-escaped
+  newline wrote a literal line break inside a string, and `node --check`
+  turned a confusing suite failure into an obvious one.
+
+Not built, deliberately: standalone chromatic aberration. It is reachable
+inside the CRT pass, and pulling it out is worth doing when something actually
+wants it without the scanlines, not on speculation.
 
 ---
 

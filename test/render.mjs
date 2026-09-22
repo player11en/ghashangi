@@ -526,6 +526,44 @@ await page.evaluate(async () => { await window.__viewer.post.setAscii(false); })
 await page.evaluate(async () => { await window.__viewer.post.setHalftone(true); });
 await settle();
 const halftoneDots = await viewportHash();
+// Pixel sort (Phase 9). A window-limited true sort, not a smear: within the
+// window the pixels are genuinely ranked by luminance via binary search, and
+// only pixels between the two cutoffs take part - which is what tears bands
+// out of the image instead of smearing all of it. The classic technique sorts
+// arbitrarily long runs, which needs multi-pass bitonic sorting; the visible
+// difference is that streaks stop at the run length.
+await page.evaluate(async () => { await window.__viewer.post.setPixelSort(true); });
+await settle(1200);
+const sortOn = await viewportHash();
+check('Pixel sort changes the rendered image', sortOn !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setPixelSortParam('vertical', 1));
+await settle();
+check('vertical sort differs from horizontal', (await viewportHash()) !== sortOn);
+
+await page.evaluate(() => {
+  const p = window.__viewer.post;
+  p.setPixelSortParam('vertical', 0);
+  p.setPixelSortParam('windowSize', 48);
+});
+await settle();
+check('Pixel sort run length is a real dial', (await viewportHash()) !== sortOn);
+
+await page.evaluate(() => {
+  const p = window.__viewer.post;
+  p.setPixelSortParam('windowSize', 24);
+  p.setPixelSortParam('reverse', 1);
+});
+await settle();
+check('reversing the sort order differs', (await viewportHash()) !== sortOn);
+
+await page.evaluate(async () => {
+  const p = window.__viewer.post;
+  p.setPixelSortParam('reverse', 0);
+  await p.setPixelSort(false);
+});
+await settle();
+
 // Standalone dither (Phase 9). Dithering existed only inside palette-pass.js,
 // welded to pixelation and a fixed console palette. This is the same technique
 // with a plain level count instead, which reaches the 1-bit/newsprint territory

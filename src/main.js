@@ -736,6 +736,7 @@ function syncStyleRows() {
     ['lutToggle', '[data-lut]'],
     ['voronoiToggle', '[data-voronoi]'],
     ['ditherToggle', '[data-dither]'],
+    ['pixelSortToggle', '[data-pixelsort]'],
     ['outlineToggle', '[data-outline]'],
     ['kuwaharaToggle', '[data-kuwahara]'],
     ['pixelateToggle', '[data-pixelate]'],
@@ -799,6 +800,7 @@ function checkStyleCost() {
 const STYLE_LABELS = {
   bloom: 'Bloom', colorGrade: 'Color grade', lut: 'LUT', tone: 'Tone',
   kuwahara: 'Painterly', voronoi: 'Voronoi', pixelate: 'Pixelate', dither: 'Dither',
+  pixelSort: 'Pixel sort',
   palette: 'Retro palette',
   halftone: 'Halftone / print', repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails',
   ascii: 'ASCII', crt: 'CRT', film: 'Film', glitch: 'Glitch',
@@ -806,6 +808,7 @@ const STYLE_LABELS = {
 const STYLE_TOGGLE_IDS = {
   bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', lut: 'lutToggle', tone: 'toneToggle',
   kuwahara: 'kuwaharaToggle', voronoi: 'voronoiToggle', dither: 'ditherToggle',
+  pixelSort: 'pixelSortToggle',
   pixelate: 'pixelateToggle', palette: 'paletteToggle',
   halftone: 'halftoneToggle', repeat: 'repeatToggle', displace: 'displaceToggle',
   afterimage: 'afterimageToggle', ascii: 'asciiToggle', crt: 'crtToggle', film: 'filmToggle',
@@ -982,6 +985,28 @@ bindCheckbox('outlineToggle', async (on) => {
 $('outlineColor').addEventListener('input', (e) => viewer.post.setOutlineColor(e.target.value));
 bindSlider('outlineThickness', (v) => viewer.post.setOutlineThickness(v), fixed1);
 bindSlider('outlineStrength', (v) => viewer.post.setOutlineStrength(v), fixed1);
+
+bindCheckbox('pixelSortToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setPixelSort(on);
+    renderStyleOrder();
+    if (on) checkStyleCost();
+  } catch (error) {
+    console.error('[Ghashangi] pixel sort failed to initialise', error);
+    toasts.error('Could not enable Pixel sort', String(error.message));
+    $('pixelSortToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('pixelSortAxis').addEventListener('change', (e) => {
+  viewer.post.setPixelSortParam('vertical', parseFloat(e.target.value));
+});
+bindSlider('pixelSortWindow', (v) => viewer.post.setPixelSortParam('windowSize', v), (v) => `${v}px`);
+bindSlider('pixelSortLow', (v) => viewer.post.setPixelSortParam('lowThreshold', v), fixed2);
+bindSlider('pixelSortHigh', (v) => viewer.post.setPixelSortParam('highThreshold', v), fixed2);
+bindCheckbox('pixelSortReverse', (on) => viewer.post.setPixelSortParam('reverse', on ? 1 : 0));
 
 bindCheckbox('ditherToggle', async (on) => {
   markStyleTouched();

@@ -31,6 +31,22 @@ The `?debug` is needed against a production build: `src/main.js` only exposes
 change that should not alter the image, and compare afterwards to catch
 lighting or colour-space drift.
 
+## Run the suites sequentially, with a pause
+
+`npm test` runs them one after another, and that is required rather than
+preferred. Two concurrent headless Chromium instances contend for the software
+rasterizer hard enough to fail timing-sensitive checks.
+
+Even sequentially, eight real browser sessions back to back can exhaust this
+environment: a batch run failed on `render` and `materials` while both passed
+standalone (80/80 and 35/35), and the same batch with a three-second pause
+between suites passed all eight - 287 checks, zero failures. If a batch fails
+on suites that pass alone, that is what is happening; add the pause rather
+than hunting for a defect.
+
+The heaviest single pass is pixel sort, whose shader takes around five seconds
+to compile under SwiftShader.
+
 ## Why not Playwright screenshots
 
 Image comparisons hash the output of the viewer's own `captureScreenshot()`,

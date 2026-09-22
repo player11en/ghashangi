@@ -66,6 +66,7 @@ import { createPresetLut } from './passes/lut-pass.js';
 import { createVoronoiShader, setVoronoiMode } from './passes/voronoi-pass.js';
 import { createKuwaharaShader } from './passes/kuwahara-pass.js';
 import { createDitherShader } from './passes/dither-pass.js';
+import { createPixelSortShader } from './passes/pixel-sort-pass.js';
 import { createHalftoneShader, setHalftoneMode } from './passes/halftone-pass.js';
 import { createFilmShader, applyFilmPreset } from './passes/film-pass.js';
 
@@ -116,7 +117,7 @@ async function loadModules() {
 // five Track 5.3 additions land between Bloom and CRT, per the plan.
 const STYLE_KEYS = [
   'bloom', 'colorGrade', 'lut', 'tone', 'kuwahara', 'pixelate', 'dither', 'palette', 'halftone',
-  'voronoi', 'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'film', 'glitch',
+  'voronoi', 'repeat', 'pixelSort', 'displace', 'afterimage', 'ascii', 'crt', 'film', 'glitch',
 ];
 
 /**
@@ -136,8 +137,9 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   const passes = {};
   const styleEnabled = {
     bloom: false, colorGrade: false, lut: false, tone: false, kuwahara: false, pixelate: false,
-    dither: false, palette: false, halftone: false, voronoi: false, repeat: false, displace: false,
-    afterimage: false, ascii: false, crt: false, film: false, glitch: false,
+    dither: false, palette: false, halftone: false, voronoi: false, repeat: false,
+    pixelSort: false, displace: false, afterimage: false, ascii: false, crt: false,
+    film: false, glitch: false,
   };
   let styleOrder = [...STYLE_KEYS];
 
@@ -291,6 +293,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     passes.tone = new ShaderPass(createToneShader());
     passes.pixelate = new ShaderPass(createPixelateShader());
     passes.dither = new ShaderPass(createDitherShader());
+    passes.pixelSort = new ShaderPass(createPixelSortShader());
     passes.voronoi = new ShaderPass(createVoronoiShader());
     passes.kuwahara = new ShaderPass(createKuwaharaShader());
     passes.palette = new ShaderPass(createPaletteShader());
@@ -381,6 +384,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     if (passes.palette) passes.palette.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.pixelate) passes.pixelate.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.dither) passes.dither.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.pixelSort) passes.pixelSort.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.voronoi) passes.voronoi.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.kuwahara) passes.kuwahara.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.tone) passes.tone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
@@ -781,6 +785,15 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
     setVoronoiParam(name, value) {
       if (passes.voronoi?.uniforms[name]) passes.voronoi.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    setPixelSort(enabled) {
+      return setStyleEnabled('pixelSort', enabled);
+    },
+
+    setPixelSortParam(name, value) {
+      if (passes.pixelSort?.uniforms[name]) passes.pixelSort.uniforms[name].value = value;
       invalidate(2);
     },
 
