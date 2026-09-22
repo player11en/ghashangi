@@ -303,6 +303,10 @@ not geometry, were the thing to compress.
 Bug reports and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for
 setup, the test suite, and what kind of changes fit this project's scope.
 
+[ROADMAP.md](ROADMAP.md) has what is planned next, what the known gaps are,
+and what is deliberately not planned — worth a look before starting work on
+anything substantial.
+
 ## Credits
 
 Built on [three.js](https://threejs.org) r186. Test models from the

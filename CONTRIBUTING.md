@@ -29,6 +29,13 @@ iterate on: `test:links`, `test:smoke`, `test:stats`, `test:animation`,
 full `npm test` before opening the PR regardless — see
 [test/README.md](test/README.md) for what each suite actually covers.
 
+## What is worth working on
+
+[ROADMAP.md](ROADMAP.md) lists the planned phases, the known gaps, and what is
+deliberately out of scope with the reasoning for each. Reading its "Not
+planned" table before starting something substantial will save you the most
+time.
+
 ## What kind of changes fit here
 
 This is one app, one engine, one control panel — not two products behind a
