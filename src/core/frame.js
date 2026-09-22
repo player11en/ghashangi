@@ -140,7 +140,7 @@ export function normalizeObject(object, { targetSize = TARGET_SIZE } = {}) {
  *   angle and only change distance. False resets to a default three-quarter view.
  */
 export function frameCamera(camera, controls, object, options = {}) {
-  const { fitRatio = 1.25, keepDirection = true } = options;
+  const { fitRatio = 1.25, keepDirection = true, direction = null } = options;
   const { sphere, isEmpty } = measure(object);
   if (isEmpty) return;
 
@@ -153,7 +153,15 @@ export function frameCamera(camera, controls, object, options = {}) {
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
   const distance = (radius * fitRatio) / Math.sin(Math.min(vFov, hFov) / 2);
 
-  if (keepDirection) {
+  if (direction) {
+    // An explicit view direction (the saved-view buttons). Takes precedence
+    // over keepDirection, which exists for "refit without moving the camera",
+    // and reuses the distance, near/far and controls-limit maths below rather
+    // than each caller working out its own camera position.
+    _dir.copy(direction);
+    if (_dir.lengthSq() < 1e-8) _dir.set(0.6, 0.45, 1);
+    _dir.normalize();
+  } else if (keepDirection) {
     _dir.subVectors(camera.position, sphere.center);
     // A camera sitting exactly on the target has no direction to preserve.
     if (_dir.lengthSq() < 1e-8) _dir.set(0.6, 0.45, 1);

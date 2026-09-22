@@ -369,6 +369,55 @@ const reference = await page.evaluate(async () => {
 await writeFile(`${ARTIFACT_DIR}/viewport.png`, Buffer.from(reference));
 console.log(`\nReference image written to ${ARTIFACT_DIR}/viewport.png`);
 
+// --- saved views (Phase 8) ------------------------------------------------
+//
+// Five one-click views. They go through frameCamera()'s existing distance,
+// near/far and controls-limit maths via a new `direction` option rather than
+// each one computing its own camera position - so the check that matters is
+// that all five frame at the *same* distance. A view that drifts from that
+// means the shared path got bypassed.
+
+console.log('\nSaved views');
+
+const viewNames = ['front', 'threeQuarter', 'side', 'top', 'back'];
+const views = {};
+for (const name of viewNames) {
+  views[name] = await page.evaluate((n) => {
+    const v = window.__viewer;
+    v.setView(n);
+    return {
+      pos: v.camera.position.toArray().map((x) => Number(x.toFixed(3))),
+      targetY: Number(v.controls.target.y.toFixed(3)),
+      dist: Number(v.camera.position.distanceTo(v.controls.target).toFixed(3)),
+      finite: v.camera.matrixWorld.elements.every(Number.isFinite),
+    };
+  }, name);
+}
+
+const distinct = new Set(viewNames.map((n) => views[n].pos.join(',')));
+check('each saved view is a distinct camera position', distinct.size === viewNames.length, `${distinct.size} of ${viewNames.length}`);
+
+const distances = new Set(viewNames.map((n) => views[n].dist));
+check(
+  'every view frames at the same distance',
+  distances.size === 1,
+  [...distances].join(', '),
+);
+
+check(
+  'front and back are opposed',
+  Math.abs(views.front.pos[2] + views.back.pos[2]) < 0.01,
+  `${views.front.pos[2]} vs ${views.back.pos[2]}`,
+);
+
+// Top is the one that can break: a view direction parallel to the camera's up
+// vector has no unique orientation, which shows up as a non-finite matrix.
+check('top looks down from above', views.top.pos[1] > views.top.targetY);
+check('top is not a degenerate orientation', views.top.finite);
+
+await page.evaluate(() => window.__viewer.setView('threeQuarter'));
+await page.waitForTimeout(200);
+
 // --- panel tabs -----------------------------------------------------------
 //
 // The panel's 13 sections moved from one scrolling column into 5 tabs. The

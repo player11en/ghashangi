@@ -467,6 +467,13 @@ bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
 
+// Saved views. Delegated from the row rather than one listener per button,
+// since the set is markup-driven - adding a view means adding a button, not
+// touching this file.
+for (const button of document.querySelectorAll('[data-view]')) {
+  button.addEventListener('click', () => viewer.setView(button.dataset.view));
+}
+
 /**
  * Put every control back to its shipped default.
  *

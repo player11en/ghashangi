@@ -482,6 +482,20 @@ input[type='checkbox'] {
   border-top: 2px solid var(--accent);
 }
 
+/* Five views across one row: narrower than .row-buttons' two, so they get
+   equal shares and no label wraps. */
+.row-views {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.row-views .button {
+  flex: 1 1 0;
+  padding: 6px 2px;
+  font-size: 11px;
+}
+
 .panel-reset {
   margin-top: 18px;
 }

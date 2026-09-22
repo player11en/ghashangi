@@ -31,6 +31,7 @@ import {
   Scene,
   PerspectiveCamera,
   Group,
+  Vector3,
   SRGBColorSpace,
   PCFShadowMap,
   DoubleSide,
@@ -952,6 +953,32 @@ export function createViewer({ container }) {
     },
     isStageVisible() {
       return stageRoot.visible;
+    },
+
+    /**
+   * Jump to a named view of the subject, framed the same way frame() does.
+   *
+   * Top is (0, 1, 0.001) rather than straight up on purpose: a view direction
+   * exactly parallel to the camera's up vector is degenerate - lookAt() has no
+   * unique solution and the orientation snaps unpredictably. The fraction is
+   * far too small to see and removes the ambiguity.
+   */
+    setView(name) {
+      if (!current) return;
+      const directions = {
+        front: [0, 0, 1],
+        threeQuarter: [0.6, 0.45, 1],
+        side: [1, 0, 0],
+        top: [0, 1, 0.001],
+        back: [0, 0, -1],
+      };
+      const d = directions[name];
+      if (!d) return;
+      frameCamera(camera, controls, modelRoot, {
+        keepDirection: false,
+        direction: new Vector3(d[0], d[1], d[2]),
+      });
+      loop.invalidate(2);
     },
 
     /** Re-fit the camera to the current subject. */
