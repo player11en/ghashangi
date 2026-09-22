@@ -94,6 +94,35 @@ Phase 9.
 - **Camera bookmarks** — front, three-quarter, top, back as one-click views,
   separate from the camera-path animation. Lighter than keyframing for
   someone who wants three consistent angles.
+- **Record from a locked-off camera** — a clip from the current view, or from
+  one saved waypoint held for the whole duration, with nothing moving but the
+  scene itself.
+
+  Currently impossible, and the gap is not obvious from the feature list:
+  turntable rotates the model, a camera path demands movement between at least
+  two waypoints, and a screenshot is one frame. There is no way to record the
+  thing a locked-off camera is *for* — a model playing its own animation clip,
+  or the time-varying Style passes (glitch, trails, displace, film grain, and
+  any keyframed parameter from Phase 10) which all produce motion on their own
+  without the camera doing anything.
+
+  **Cheapest item in this roadmap, verified rather than assumed.** Two things
+  already support it:
+
+  - `recorder.js`'s `onFrame` already defaults to a no-op, so
+    `recordClip()` with no per-frame callback records a static camera today.
+    The generic recorder needs no changes at all.
+  - `camera-path.js`'s `evaluate()` already handles `waypoints.length === 1`
+    explicitly, returning that waypoint's position and target.
+
+  What blocks it is three explicit guards, nothing structural: `play()` and
+  `recordCameraPath()` both bail below two waypoints, and the panel disables
+  Preview and Record on the same condition. A one-waypoint path is a valid
+  static shot, not an incomplete move.
+
+  Two entry points worth having, since they answer different questions:
+  "record what I am looking at right now" needs no waypoints at all, and
+  "record from the framing I saved earlier" is the relaxed one-waypoint path.
 
 ---
 
