@@ -816,9 +816,32 @@ const STYLE_TOGGLE_IDS = {
 };
 
 /** Move `key` to `toIndex` and commit the new chain order. */
+/** The effects actually switched on, in composite order. */
+function enabledStyleKeys() {
+  return viewer.post.styleOrder.filter((key) => $(STYLE_TOGGLE_IDS[key]).checked);
+}
+
+/**
+ * Move an effect to a new position *among the enabled effects*, and fold that
+ * back into the full 17-key order.
+ *
+ * The list on screen shows only what is switched on, but the composite order
+ * the engine uses covers every effect including the off ones. Reordering two
+ * visible rows must not silently shuffle the invisible entries between them,
+ * or switching a third effect on later would put it somewhere the user never
+ * chose. So the disabled keys keep their slots: the reordered enabled keys are
+ * poured back into the positions the enabled keys previously occupied.
+ */
 function moveStyle(key, toIndex) {
-  const next = viewer.post.styleOrder.filter((k) => k !== key);
-  next.splice(Math.max(0, Math.min(next.length, toIndex)), 0, key);
+  const full = viewer.post.styleOrder;
+  const enabled = enabledStyleKeys();
+
+  const reordered = enabled.filter((k) => k !== key);
+  reordered.splice(Math.max(0, Math.min(reordered.length, toIndex)), 0, key);
+
+  let cursor = 0;
+  const next = full.map((k) => (enabled.includes(k) ? reordered[cursor++] : k));
+
   viewer.post.setStyleOrder(next);
   renderStyleOrder();
   settings.save();
@@ -826,8 +849,20 @@ function moveStyle(key, toIndex) {
 
 function renderStyleOrder() {
   const list = $('styleOrderList');
-  const order = viewer.post.styleOrder;
+  // Only the enabled effects. Listing all 17 regardless meant the Style tab
+  // showed 17 checkboxes and then the same 17 names again directly underneath,
+  // most of them inert - roughly twice the length it needed to be, and the
+  // second list carried no information the first did not.
+  const order = enabledStyleKeys();
   list.replaceChildren();
+
+  const empty = $('styleOrderEmpty');
+  empty.hidden = order.length > 0;
+  // One effect has nothing to reorder against, so the list is only meaningful
+  // from two upward - but it is still shown at one, because seeing the single
+  // entry appear is what explains what the list is for.
+  $('styleOrderRow').hidden = order.length === 0;
+  list.hidden = order.length === 0;
 
   order.forEach((key, index) => {
     const item = document.createElement('li');

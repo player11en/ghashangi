@@ -431,6 +431,79 @@ check(
   `hidden=${composes.hiddenAttr} advanced-hidden=${composes.advancedClass}`,
 );
 
+// --- style chain list -----------------------------------------------------
+//
+// The list used to render all 18 effects regardless of which were switched on,
+// so the Style tab showed 18 checkboxes and then the same 18 names again
+// underneath, most of them inert. It now shows only the enabled ones.
+//
+// The subtle property worth protecting is the second check below: the visible
+// list is a filtered view of a full 18-key composite order, and reordering two
+// visible rows must not shuffle the disabled keys sitting between them - or
+// switching a further effect on later would drop it somewhere nobody chose.
+
+console.log('\nStyle chain list');
+
+await page.evaluate(() => {
+  document.querySelector('.tab[data-tab="style"]').click();
+  const body = document.getElementById('styleBody');
+  if (body.hidden) body.closest('.group').querySelector('.group-title').click();
+  if (!document.getElementById('advancedToggle').checked) {
+    document.getElementById('advancedToggle').click();
+  }
+});
+await page.waitForTimeout(400);
+
+const chainEmpty = await page.evaluate(() => ({
+  rows: document.querySelectorAll('#styleOrderList .style-order-item').length,
+  emptyShown: !document.getElementById('styleOrderEmpty').hidden,
+}));
+check('the chain list is empty with no effects on', chainEmpty.rows === 0 && chainEmpty.emptyShown);
+
+for (const id of ['bloomToggle', 'crtToggle', 'ditherToggle']) {
+  await page.evaluate((i) => document.getElementById(i).click(), id);
+  await page.waitForTimeout(900);
+}
+
+const chainThree = await page.evaluate(() => ({
+  rows: [...document.querySelectorAll('#styleOrderList .style-order-item')].map((e) => e.dataset.key),
+  emptyShown: !document.getElementById('styleOrderEmpty').hidden,
+  full: window.__viewer.post.styleOrder,
+}));
+check('the chain lists only the enabled effects', chainThree.rows.length === 3 && !chainThree.emptyShown,
+  chainThree.rows.join(', '));
+
+await page.evaluate(() => {
+  const items = document.querySelectorAll('#styleOrderList .style-order-item');
+  items[items.length - 1].querySelectorAll('button')[0].click();
+});
+await page.waitForTimeout(500);
+
+const chainMoved = await page.evaluate(() => ({
+  rows: [...document.querySelectorAll('#styleOrderList .style-order-item')].map((e) => e.dataset.key),
+  full: window.__viewer.post.styleOrder,
+}));
+check('reordering moves the visible row', chainMoved.rows.join() !== chainThree.rows.join(),
+  `${chainThree.rows.join(', ')} -> ${chainMoved.rows.join(', ')}`);
+
+const on = new Set(chainThree.rows);
+const disabledBefore = chainThree.full.filter((k) => !on.has(k)).join();
+const disabledAfter = chainMoved.full.filter((k) => !on.has(k)).join();
+const slotsBefore = chainThree.full.map((k, i) => (on.has(k) ? i : -1)).filter((i) => i >= 0).join();
+const slotsAfter = chainMoved.full.map((k, i) => (on.has(k) ? i : -1)).filter((i) => i >= 0).join();
+check('reordering leaves the disabled effects where they were',
+  disabledBefore === disabledAfter && slotsBefore === slotsAfter);
+
+for (const id of ['bloomToggle', 'crtToggle', 'ditherToggle']) {
+  await page.evaluate((i) => document.getElementById(i).click(), id);
+  await page.waitForTimeout(600);
+}
+await page.evaluate(() => {
+  document.getElementById('advancedToggle').click();
+  document.querySelector('.tab[data-tab="model"]').click();
+});
+await page.waitForTimeout(300);
+
 // --- frame guide (Phase 8) -----------------------------------------------
 //
 // A passepartout overlay marking where an export will crop. The two things
