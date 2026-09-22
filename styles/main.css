@@ -459,6 +459,11 @@ input[type='checkbox'] {
 .hint[data-level='error'] { color: var(--danger); }
 .hint[data-level='warn'] { color: var(--warn); }
 
+/* Sits below the last section: a global action, not part of any one group. */
+.panel-reset {
+  margin-top: 18px;
+}
+
 .panel-footer {
   margin: 4px 0 0;
   padding: 12px 0 4px;

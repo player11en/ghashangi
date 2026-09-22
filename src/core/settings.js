@@ -155,6 +155,17 @@ function writeField({ id, kind }, value) {
  *   it's a permutation of effect keys, not a single DOM element's value.
  */
 export function createSettings({ accordion, orientation, post }) {
+  // The shipped defaults, captured from the DOM itself at construction.
+  //
+  // Timing is the whole trick and it is load-bearing: createSettings() runs
+  // early in main.js, while applyQualityTier(detectedTier) and load() both run
+  // much later, near the end. So what is in the DOM right now is exactly what
+  // index.html authored - not a tier-adjusted state, and not a restored
+  // session. Reading the markup rather than maintaining a second table of
+  // default values means the two can never drift apart.
+  const shippedDefaults = Object.fromEntries(FIELDS.map((f) => [f.id, readField(f)]));
+  const shippedStyleOrder = [...post.styleOrder];
+
   function save() {
     const data = {
       fields: Object.fromEntries(FIELDS.map((f) => [f.id, readField(f)])),
@@ -204,6 +215,30 @@ export function createSettings({ accordion, orientation, post }) {
   }
 
   /**
+   * Put every tracked control back to the value index.html shipped with, and
+   * forget the saved session.
+   *
+   * Deliberately not a page reload, which would be the cheap way to do this:
+   * a reload also throws away the loaded model, and someone who has spent ten
+   * minutes on a colourway should not lose the model to undo the lighting.
+   *
+   * Replays the snapshot through the same writeField() that load() uses, so
+   * every apply path, readout sync and dependent-row toggle runs exactly as it
+   * would for a real edit. There is no second setter path here that could
+   * drift from the UI's own.
+   */
+  function reset() {
+    for (const field of FIELDS) writeField(field, shippedDefaults[field.id]);
+    post.setStyleOrder(shippedStyleOrder);
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Same tolerance as save(): inaccessible storage is not an error here.
+    }
+  }
+
+  /**
    * Start auto-saving on every change to a tracked control or a section being
    * opened/closed. Separate from load() so load()'s own writes — which
    * dispatch the same events a user's edit would — can never be mistaken for
@@ -228,5 +263,5 @@ export function createSettings({ accordion, orientation, post }) {
     }
   }
 
-  return { save, load, watch };
+  return { save, load, watch, reset };
 }

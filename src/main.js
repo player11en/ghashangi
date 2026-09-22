@@ -448,9 +448,6 @@ bindCheckbox('stageToggle', (on) => {
 });
 $('stageColor').addEventListener('input', (e) => viewer.setStageColor(e.target.value));
 bindSlider('stageRoughness', (v) => viewer.setStageRoughness(v), fixed2);
-// Separate from the setter above so bindSlider's wiring-time apply() cannot
-// count as the user asking to override Stage.glb's authored material.
-$('stageRoughness').addEventListener('input', () => viewer.markStageRoughnessTouched());
 
 /** Stage appearance only means anything while the stage is actually shown. */
 function syncStageRows() {
@@ -461,6 +458,40 @@ syncStageRows();
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
+
+/**
+ * Put every control back to its shipped default.
+ *
+ * Split from the click handler below so the test suite can drive it without a
+ * confirm() dialog - the same reason window.__viewer exists at all.
+ */
+function resetAllSettings() {
+  settings.reset();
+  // The tier re-applies afterwards for the same reason it applies at startup:
+  // "default" on a low-tier device means AO, AA and Style off, which is not
+  // what the markup's own values say.
+  applyQualityTier(viewer.detectedTier);
+  $('qualityTier').value = viewer.detectedTier;
+  renderStyleOrder();
+  syncStyleRows();
+  syncStageRows();
+  syncDofFocusFromSubject();
+}
+
+// Confirmed first: this discards a whole session of lighting, Style and
+// fidelity work in one click and has no undo (material edits have their own
+// history; these settings do not).
+$('resetSettings').addEventListener('click', () => {
+  const ok = window.confirm(
+    'Reset all settings to defaults?\n\n'
+    + 'Lighting, Style effects, fidelity and quality go back to how the app '
+    + 'shipped. Your model stays loaded, and saved colourways are kept.',
+  );
+  if (!ok) return;
+
+  resetAllSettings();
+  toasts.info('Settings reset to defaults');
+});
 
 // Dense-model triangle budget (Stats group). Takes effect on the next model
 // loaded, not retroactively - the pre-simplification geometry of whatever is
@@ -1306,6 +1337,8 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   // importing the module in devtools. window.__telemetry() is the actual
   // queryable surface its own file header promised.
   window.__telemetry = readTelemetry;
+  // Reset without the confirm() dialog, for test/render.mjs's reset checks.
+  window.__settingsReset = resetAllSettings;
   window.__cameraPath = cameraPath;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;

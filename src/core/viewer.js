@@ -472,17 +472,23 @@ export function createViewer({ container }) {
   // it is held here and re-applied on every install - otherwise loading a new
   // model would quietly reset the backdrop to the file's authored white while
   // the panel still showed the chosen colour.
-  // Each of these applies only once the user has actually asked for it.
-  // bindSlider() in main.js calls its apply() once at wiring time to sync the
-  // readout, and a colour input carries a default value whether or not anyone
-  // touched it - so applying unconditionally would overwrite whatever
-  // Stage.glb authored with this app's guesses on every single load. That is
-  // exactly the bug DOF's focus seeding hit (see post.js's
-  // markDofFocusTouched), so it uses the same explicit-intent flag here.
-  let stageColor = '#ffffff';
-  let stageRoughness = 0.9;
-  let stageColorTouched = false;
-  let stageRoughnessTouched = false;
+  // These mirror Stage.glb's own authored material (#e7e7e7, roughness 0.5 -
+  // read off the loaded asset, not guessed), and index.html carries the same
+  // two values as its control defaults.
+  //
+  // That agreement is load-bearing rather than cosmetic. A "preserve whatever
+  // the asset authored unless the user touches it" flag was tried first and
+  // does not work here: settings.js restores a field by assigning its value and
+  // dispatching a real 'input' event, which is indistinguishable from someone
+  // moving the slider - so both load() and reset() counted as explicit intent
+  // and permanently stamped this app's guesses over the authored material.
+  // Caught by a reset test asserting the image returns to baseline exactly.
+  //
+  // Declaring one set of defaults that happens to equal the authored values
+  // removes the divergence instead of trying to detect it: startup, reset and a
+  // restored session all land on the same image.
+  let stageColor = '#e7e7e7';
+  let stageRoughness = 0.5;
 
   function applyStageAppearance() {
     const stage = stageRoot.children[0];
@@ -491,10 +497,8 @@ export function createViewer({ container }) {
       if (!node.isMesh) return;
       for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
         if (!material) continue;
-        if (stageColorTouched) material.color?.set(stageColor);
-        if (stageRoughnessTouched && material.roughness !== undefined) {
-          material.roughness = stageRoughness;
-        }
+        material.color?.set(stageColor);
+        if (material.roughness !== undefined) material.roughness = stageRoughness;
       }
     });
     lights.requestShadowUpdate();
@@ -936,22 +940,13 @@ export function createViewer({ container }) {
       stageRoot.visible = visible;
       loop.invalidate();
     },
-    // A colour input only fires on real interaction, so this is always
-    // explicit intent - unlike setStageRoughness below.
     setStageColor(hex) {
       stageColor = hex;
-      stageColorTouched = true;
       applyStageAppearance();
       loop.invalidate(2);
     },
     setStageRoughness(value) {
       stageRoughness = value;
-      if (stageRoughnessTouched) applyStageAppearance();
-      loop.invalidate(2);
-    },
-    /** Called only from a real 'input' event - see applyStageAppearance. */
-    markStageRoughnessTouched() {
-      stageRoughnessTouched = true;
       applyStageAppearance();
       loop.invalidate(2);
     },

@@ -297,6 +297,77 @@ await settle();
 check('toggling DOF off restores the original image exactly', (await viewportHash()) === baseline);
 await page.evaluate(() => window.__viewer.post.setDofAperture(0.002));
 
+// --- global settings reset (Phase 7) --------------------------------------
+//
+// The same pixel-exact guarantee every individual pass carries, applied to the
+// whole panel at once: mutate a spread of unrelated controls, reset, and the
+// image has to land back on the untouched baseline. This is the check that
+// makes the reset trustworthy enough to reach for after over-cranking a setup,
+// which is the only reason it exists.
+
+console.log('\nSettings reset');
+
+// Driven through the DOM, not the viewer API, and that distinction is the
+// whole point: reset works by replaying index.html's own values back through
+// the same events a real edit fires. An earlier version of this test cranked
+// everything via window.__viewer directly, which left the engine enabled while
+// the checkboxes stayed false - so reset had nothing to undo and the checks
+// below passed vacuously while the image stayed wrong. Drive the controls the
+// way a person does, or this proves nothing.
+async function setControl(id, value) {
+  await page.evaluate(([elId, v]) => {
+    const el = document.getElementById(elId);
+    el.value = String(v);
+    el.dispatchEvent(new Event('input'));
+  }, [id, value]);
+}
+
+await page.evaluate(() => document.getElementById('bloomToggle').click());
+await page.evaluate(() => document.getElementById('pixelateToggle').click());
+// Both toggles lazy-load their pass modules, so wait for the engine to catch up
+// with the clicks rather than assuming it already has.
+await page.waitForFunction(() => window.__viewer.post.styleEffectCount === 2, null, { timeout: 20_000 });
+
+// Bloom threshold is in here deliberately: it was implemented and unreachable
+// until Phase 7, so nothing had ever verified it changes the image at all.
+await setControl('bloomThreshold', 0);
+await setControl('bloomStrength', 1.5);
+await setControl('ambientSlider', 2.4);
+await setControl('leftColor', '#00ff00');
+await setControl('pixelateSize', 24);
+await settle(700);
+
+const cranked = await viewportHash();
+check('an over-cranked setup changes the image', cranked !== baseline);
+
+// Threshold 0 vs 1 with everything else held still - the control that decides
+// what blooms, rather than how much.
+await setControl('bloomThreshold', 1);
+await settle();
+check('bloom threshold 0 differs from threshold 1', (await viewportHash()) !== cranked);
+
+const resetState = await page.evaluate(() => {
+  window.__settingsReset();
+  return {
+    bloomOn: document.getElementById('bloomToggle').checked,
+    pixelateOn: document.getElementById('pixelateToggle').checked,
+    ambient: document.getElementById('ambientSlider').value,
+    leftColor: document.getElementById('leftColor').value,
+    threshold: document.getElementById('bloomThreshold').value,
+  };
+});
+// Reset unchecks toggles via .click(), whose handlers are async.
+await page.waitForFunction(() => window.__viewer.post.styleEffectCount === 0, null, { timeout: 20_000 });
+await settle(700);
+
+check('reset unchecks the effects it turned on',
+  resetState.bloomOn === false && resetState.pixelateOn === false,
+  `bloom ${resetState.bloomOn}, pixelate ${resetState.pixelateOn}`);
+check('reset restores slider values', resetState.ambient === '0.3' && resetState.threshold === '0.7',
+  `ambient ${resetState.ambient}, threshold ${resetState.threshold}`);
+check('reset restores colour pickers', resetState.leftColor === '#b2b2ff', resetState.leftColor);
+check('reset returns the image to the baseline exactly', (await viewportHash()) === baseline);
+
 // --- style effects (Track 4.3/4.4) ----------------------------------------
 //
 // Same fallback guarantee as AO: cycling every Style effect on and back off

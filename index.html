@@ -112,12 +112,12 @@
         </div>
         <div class="row" data-stage>
           <label for="stageColor">Stage color</label>
-          <input type="color" id="stageColor" value="#ffffff">
+          <input type="color" id="stageColor" value="#e7e7e7">
         </div>
         <div class="row" data-stage>
           <label for="stageRoughness">Stage roughness</label>
-          <input type="range" id="stageRoughness" min="0" max="1" step="0.05" value="0.9">
-          <input type="text" inputmode="decimal" class="value-input" id="stageRoughnessOut" value="0.90" aria-label="Stage roughness value">
+          <input type="range" id="stageRoughness" min="0" max="1" step="0.05" value="0.5">
+          <input type="text" inputmode="decimal" class="value-input" id="stageRoughnessOut" value="0.50" aria-label="Stage roughness value">
         </div>
         <div class="row row-check">
           <input type="checkbox" id="wireframe">
@@ -884,6 +884,13 @@
         </p>
         </div>
       </section>
+
+      <div class="row row-buttons panel-reset">
+        <button type="button" id="resetSettings" class="button button-quiet"
+                title="Put lighting, Style, fidelity and every other control back to defaults">
+          Reset all settings
+        </button>
+      </div>
 
       <footer class="panel-footer hint">
         <a href="https://github.com/player11en/ghashangi" target="_blank" rel="noopener">Ghashangi</a>
