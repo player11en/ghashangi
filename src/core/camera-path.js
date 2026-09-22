@@ -25,7 +25,16 @@ import { recordClip } from './recorder.js';
  * @param {() => void} [options.onChange]  Called whenever the waypoint list
  *   changes, so a UI can rebuild.
  */
-export function createCameraPath({ viewer, onChange = () => {} }) {
+/**
+ * @param {object} options
+ * @param {object} options.viewer
+ * @param {() => void} [options.onChange]
+ * @param {(t: number) => void} [options.onTick]  Fired with normalised
+ *   path-time on every scrub, playback frame and recorded frame. Exists so
+ *   keyframed parameters run on this same clock rather than inventing a second
+ *   one - a clip has one timeline, and the camera is one track on it.
+ */
+export function createCameraPath({ viewer, onChange = () => {}, onTick = () => {} }) {
   const { camera, controls, loop } = viewer;
 
   /** @type {Array<{position: Vector3, target: Vector3, holdMs: number}>} */
@@ -134,6 +143,7 @@ export function createCameraPath({ viewer, onChange = () => {} }) {
   /** Scrub the whole path for live UI feedback, without playing it. */
   function preview(t) {
     apply(evaluate(t));
+    onTick(Math.max(0, Math.min(1, t)));
     loop.invalidate();
   }
 
@@ -145,6 +155,7 @@ export function createCameraPath({ viewer, onChange = () => {} }) {
    */
   function driveFrom(fraction, forDurationSeconds) {
     apply(evaluate(fraction, forDurationSeconds));
+    onTick(Math.max(0, Math.min(1, fraction)));
   }
 
   /**
@@ -181,11 +192,13 @@ export function createCameraPath({ viewer, onChange = () => {} }) {
     const t = elapsedMs / (durationSeconds * 1000);
     if (t >= 1) {
       apply(evaluate(1));
+      onTick(1);
       if (looping) elapsedMs = 0;
       else stop();
       return;
     }
     apply(evaluate(t));
+    onTick(t);
   }
 
   return {
@@ -278,12 +291,15 @@ export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onPro
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<Blob>} a .webm
  */
-export function recordStatic({ viewer, duration, fps = 30, onProgress, signal }) {
+export function recordStatic({ viewer, duration, fps = 30, onProgress, signal, onTick }) {
   return recordClip({
     viewer,
     duration,
     fps,
     holdKey: 'cameraPath',
+    // The camera holds still, but keyframed parameters still need the clock -
+    // a locked-off shot with an animated hue is exactly what this is for.
+    onFrame: onTick ? (fraction) => onTick(Math.max(0, Math.min(1, fraction))) : undefined,
     onSetup() {
       const wasAutoRotating = viewer.isAutoRotating();
       viewer.setAutoRotate(false);

@@ -1047,6 +1047,24 @@
               <option value="1:1">1:1</option>
             </select>
           </div>
+          <div class="row row-check">
+            <input type="checkbox" id="kfArm">
+            <label for="kfArm" title="While armed, changing any control adds a keyframe at the current scrub position">Animate (arm keys)</label>
+          </div>
+          <p class="hint" id="kfHint" data-kf>
+            Armed. Move the scrub, then change any control — it keys at that
+            point. Numbers and colours blend between keys; switches and
+            dropdowns jump.
+          </p>
+          <div class="row" data-kf>
+            <label id="kfTracksLabel">Tracks</label>
+            <span class="kf-count" id="kfCount">none</span>
+          </div>
+          <ul id="kfTrackList" class="kf-track-list" data-kf aria-labelledby="kfTracksLabel"></ul>
+          <div class="row row-buttons" data-kf>
+            <button type="button" id="kfClear" class="button button-quiet">Clear all keys</button>
+          </div>
+
           <div class="row">
             <label for="cpScrub">Scrub</label>
             <input type="range" id="cpScrub" min="0" max="1" step="0.001" value="0">

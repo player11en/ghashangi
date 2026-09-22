@@ -31,6 +31,7 @@ import { fetchFromDrive, looksLikeDriveLink, isDriveConfigured } from './sources
 import { trackObjectUrl, revokeObjectUrl } from './core/dispose.js';
 import { recordTurntable, isTurntableSupported } from './core/turntable.js';
 import { createCameraPath } from './core/camera-path.js';
+import { createKeyframes } from './core/keyframes.js';
 import { createCameraPathPanel } from './ui/camera-path-panel.js';
 import { isClipRecordingSupported } from './core/recorder.js';
 import { createMaterialUndo } from './core/material-undo.js';
@@ -112,7 +113,20 @@ let currentModelName = 'model';
 // persists across model swaps (a camera move framed for one product is a
 // reasonable starting point for the next one, unlike a model's own clips).
 let rebuildWaypointList = () => {};
-const cameraPath = createCameraPath({ viewer, onChange: () => rebuildWaypointList() });
+let rebuildKeyframeList = () => {};
+
+// Built before the camera path so its onTick can reach it: the path owns the
+// clock, keyframes are a second track on that same clock.
+const keyframes = createKeyframes({
+  settings,
+  onChange: () => rebuildKeyframeList(),
+});
+
+const cameraPath = createCameraPath({
+  viewer,
+  onChange: () => rebuildWaypointList(),
+  onTick: (t) => keyframes.apply(t),
+});
 const cameraPathPanel = createCameraPathPanel({
   viewer,
   cameraPath,
@@ -481,6 +495,87 @@ syncStageRows();
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
+
+// --- keyframes -----------------------------------------------------------
+
+/** Where the playhead currently sits, as normalised 0..1. */
+function playheadTime() {
+  return parseFloat($('cpScrub').value) || 0;
+}
+
+/**
+ * Key every armed change at the playhead.
+ *
+ * Listening on the panel rather than per control is what makes this work for
+ * all ~100 tracked settings, and for any added later, without a registration
+ * step per control. The event target's own id is the field id.
+ */
+function handleArmedEdit(event) {
+  if (!keyframes.armed) return;
+  const id = event.target?.id;
+  if (!id || id === 'cpScrub' || id === 'kfArm') return;
+  // Paired readouts mirror their slider and would key the same field twice.
+  if (event.target.classList?.contains('value-input')) return;
+  keyframes.keyCurrent(id, playheadTime());
+}
+
+$('panelBody').addEventListener('input', handleArmedEdit);
+$('panelBody').addEventListener('change', handleArmedEdit);
+
+function syncKeyframeRows() {
+  const on = $('kfArm').checked;
+  for (const row of document.querySelectorAll('[data-kf]')) row.hidden = !on;
+}
+
+rebuildKeyframeList = () => {
+  const list = $('kfTrackList');
+  list.replaceChildren();
+
+  const ids = keyframes.trackIds();
+  $('kfCount').textContent = ids.length === 0
+    ? 'none'
+    : `${ids.length} track${ids.length === 1 ? '' : 's'}, ${keyframes.keyCount} keys`;
+
+  for (const id of ids) {
+    const item = document.createElement('li');
+    item.className = 'kf-track';
+    item.dataset.field = id;
+
+    const name = document.createElement('span');
+    name.className = 'kf-track-name';
+    // The control's own label is what the user recognises; the field id is an
+    // implementation detail they never chose.
+    const label = document.querySelector(`label[for="${id}"]`);
+    name.textContent = label?.textContent.trim() || id;
+    name.title = `${id} — ${keyframes.keysFor(id).length} keys`;
+    item.appendChild(name);
+
+    const count = document.createElement('span');
+    count.className = 'kf-track-keys';
+    count.textContent = String(keyframes.keysFor(id).length);
+    item.appendChild(count);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'nudge';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', `Remove all keys for ${name.textContent}`);
+    remove.addEventListener('click', () => keyframes.clearTrack(id));
+    item.appendChild(remove);
+
+    list.appendChild(item);
+  }
+};
+
+bindCheckbox('kfArm', (on) => {
+  keyframes.armed = on;
+  syncKeyframeRows();
+});
+
+$('kfClear').addEventListener('click', () => keyframes.clear());
+
+syncKeyframeRows();
+rebuildKeyframeList();
 
 // --- frame guide ---------------------------------------------------------
 
@@ -1626,6 +1721,11 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) {
   // Reset without the confirm() dialog, for test/render.mjs's reset checks.
   window.__settingsReset = resetAllSettings;
   window.__cameraPath = cameraPath;
+  window.__keyframes = keyframes;
+  // Exposed so the keyframe suite can assert that a settings restore does not
+  // manufacture keys — writeFieldById dispatches non-bubbling events, which is
+  // exactly what keeps it invisible to the panel-level capture listener.
+  window.__settings = settings;
   window.__loadDemo = () => loadBundled(DEMO_MODEL, 'demo model');
   window.__loadFiles = loadFromFiles;
   window.__loadLink = loadFromLink;

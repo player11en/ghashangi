@@ -1,0 +1,227 @@
+// Keyframing (Phase 10).
+//
+// The design decision these checks exist to protect: there is no second
+// registry of "what is animatable". keyframes.js reads settings.js's FIELDS,
+// so anything that is a persisted setting is keyframable, and values are
+// written through settings.js's own writeField - the same path load() and
+// reset() use, which dispatches the event a real edit fires. That is what
+// keeps the readouts, dependent rows and engine calls in sync without a
+// parallel setter path.
+//
+// Two behaviours are easy to get wrong and are asserted directly:
+//
+//   * Continuous kinds (range, color) blend between keys; stepped kinds
+//     (checkbox, select, text) jump at them. A dropdown blended halfway
+//     produces a value that was never a valid option.
+//   * Playback must not write to localStorage. settings.js saves on a debounce
+//     after any tracked control changes, and a scrub changes many of them per
+//     frame - without suspension the saved session would end up wherever the
+//     playhead stopped.
+//
+// Usage: node test/keyframes.mjs [url]   (needs the dev server running)
+
+import { chromium } from 'playwright';
+
+const APP = process.argv[2] ?? 'http://localhost:5173/';
+
+const failures = [];
+function check(name, ok, detail = '') {
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  if (!ok) failures.push(name);
+}
+
+const consoleErrors = [];
+
+const browser = await chromium.launch({
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+});
+const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));
+
+await page.goto(APP, { waitUntil: 'load', timeout: 60_000 });
+await page.waitForFunction(() => window.__viewer?.model != null, null, { timeout: 60_000 });
+await page.waitForTimeout(800);
+
+// --- arming and capture ----------------------------------------------------
+
+console.log('Arming and capture');
+
+const unarmed = await page.evaluate(() => {
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  set('ambientSlider', 1.5);
+  return window.__keyframes.keyCount;
+});
+check('editing while unarmed creates no keys', unarmed === 0, `${unarmed} keys`);
+
+const armedResult = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  document.getElementById('kfArm').click();
+  set('cpScrub', 0);
+  set('ambientSlider', 0.2);
+  set('cpScrub', 1);
+  set('ambientSlider', 2);
+  return { tracks: kf.trackIds(), keys: kf.keyCount };
+});
+check('an armed edit keys the control it touched',
+  armedResult.tracks.length === 1 && armedResult.tracks[0] === 'ambientSlider',
+  armedResult.tracks.join(', '));
+check('one key lands per playhead position', armedResult.keys === 2, `${armedResult.keys} keys`);
+
+// A real click, not a synthesised event - the panel-level delegation depends
+// on the event bubbling, which is true of genuine interaction and of the
+// bubbling events above, but deliberately NOT of settings.js's own restore
+// writes. A session restore must not manufacture keyframes.
+await page.evaluate(() => {
+  const el = document.getElementById('cpScrub');
+  el.value = '0.5';
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+});
+// Navigate the way a person would: the control lives in a collapsed section
+// on another tab, and a click only counts as real interaction if it reaches a
+// visible element.
+await page.evaluate(() => {
+  document.querySelector('.tab[data-tab="look"]').click();
+  const body = document.getElementById('environmentBody');
+  if (body.hidden) body.closest('.group').querySelector('.group-title').click();
+});
+await page.waitForTimeout(250);
+await page.click('#aaToggle');
+await page.waitForTimeout(300);
+const realClick = await page.evaluate(() => window.__keyframes.trackIds().includes('aaToggle'));
+check('a real click on a checkbox is captured', realClick);
+
+const restoreSafe = await page.evaluate(() => {
+  const before = window.__keyframes.keyCount;
+  // writeFieldById is what load() and reset() use; its events do not bubble.
+  window.__settings.writeFieldById('sunSlider', 3.2);
+  return { before, after: window.__keyframes.keyCount };
+});
+check('a settings restore does not manufacture keys',
+  restoreSafe.before === restoreSafe.after,
+  `${restoreSafe.before} -> ${restoreSafe.after}`);
+
+// --- interpolation ---------------------------------------------------------
+
+console.log('\nInterpolation');
+
+const mid = await page.evaluate(() => window.__keyframes.valueAt('ambientSlider', 0.5));
+check('a range blends between keys', Math.abs(mid - 1.1) < 0.001, String(mid));
+
+const held = await page.evaluate(() => ({
+  before: window.__keyframes.valueAt('ambientSlider', 0),
+  after: window.__keyframes.valueAt('ambientSlider', 1),
+}));
+check('values hold at the ends rather than extrapolating',
+  Math.abs(held.before - 0.2) < 0.001 && Math.abs(held.after - 2) < 0.001,
+  `${held.before} .. ${held.after}`);
+
+const colour = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  kf.setKey('leftColor', 0, '#000000');
+  kf.setKey('leftColor', 1, '#ffffff');
+  return kf.valueAt('leftColor', 0.5);
+});
+check('a colour blends in RGB', colour === '#808080', colour);
+
+const stepped = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  kf.setKey('toneMapping', 0, 'agx');
+  kf.setKey('toneMapping', 1, 'aces');
+  return { low: kf.valueAt('toneMapping', 0.4), high: kf.valueAt('toneMapping', 0.95) };
+});
+check('a dropdown steps and never blends',
+  stepped.low === 'agx' && stepped.high === 'agx',
+  `0.4 -> ${stepped.low}, 0.95 -> ${stepped.high}`);
+
+// --- driving the app -------------------------------------------------------
+
+console.log('\nDriving the app');
+
+const driven = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  kf.apply(0.5);
+  return {
+    slider: document.getElementById('ambientSlider').value,
+    light: window.__viewer.lights.ambient.intensity,
+  };
+});
+check('applying drives the control and the engine together',
+  Math.abs(parseFloat(driven.slider) - 1.1) < 0.001 && Math.abs(driven.light - 1.1) < 0.001,
+  `slider ${driven.slider}, light ${driven.light}`);
+
+// The camera path owns the clock; keyframes ride the same one via onTick.
+const scrubbed = await page.evaluate(() => {
+  const el = document.getElementById('cpScrub');
+  const at = (v) => {
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return window.__viewer.lights.ambient.intensity;
+  };
+  return { start: at(0), end: at(1) };
+});
+check('scrubbing the path drives keyframed values',
+  Math.abs(scrubbed.start - 0.2) < 0.01 && Math.abs(scrubbed.end - 2) < 0.01,
+  `${scrubbed.start} -> ${scrubbed.end}`);
+
+const storageUntouched = await page.evaluate(() => {
+  const before = localStorage.getItem('3dmviewer.settings');
+  for (let i = 0; i <= 10; i++) window.__keyframes.apply(i / 10);
+  return before === localStorage.getItem('3dmviewer.settings');
+});
+check('playback does not write to localStorage', storageUntouched);
+
+// --- managing tracks -------------------------------------------------------
+
+console.log('\nTrack management');
+
+const removal = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  const before = kf.trackCount;
+  kf.clearTrack('toneMapping');
+  const after = kf.trackCount;
+  kf.clear();
+  return { before, after, cleared: kf.trackCount };
+});
+check('a single track can be removed', removal.after === removal.before - 1,
+  `${removal.before} -> ${removal.after}`);
+check('clearing removes every track', removal.cleared === 0);
+
+const roundTrip = await page.evaluate(() => {
+  const kf = window.__keyframes;
+  kf.setKey('ambientSlider', 0, 0.3);
+  kf.setKey('ambientSlider', 1, 1.9);
+  const json = JSON.parse(JSON.stringify(kf.toJSON()));
+  kf.clear();
+  kf.fromJSON(json);
+  return { tracks: kf.trackCount, mid: kf.valueAt('ambientSlider', 0.5) };
+});
+check('tracks survive a JSON round trip',
+  roundTrip.tracks === 1 && Math.abs(roundTrip.mid - 1.1) < 0.001,
+  `${roundTrip.tracks} track, midpoint ${roundTrip.mid}`);
+
+// --- report ----------------------------------------------------------------
+
+await browser.close();
+
+if (consoleErrors.length > 0) {
+  console.log(`\n${consoleErrors.length} console error(s):`);
+  for (const e of consoleErrors.slice(0, 5)) console.log(`  x ${e}`);
+  failures.push('console errors');
+}
+
+if (failures.length > 0) {
+  console.log(`\n${failures.length} failure(s).`);
+  process.exit(1);
+}
+
+console.log('\nAll checks passed.');

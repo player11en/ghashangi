@@ -553,6 +553,49 @@ input[type='checkbox'] {
   font-size: 11px;
 }
 
+/* --- keyframe tracks ----------------------------------------------------- */
+
+.kf-track-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kf-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.kf-track-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.kf-track-keys {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+
+.kf-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .panel-reset {
   margin-top: 18px;
 }

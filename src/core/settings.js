@@ -286,6 +286,13 @@ export function createSettings({ accordion, tabs, orientation, post }) {
     return String(readField(field)) === String(shippedDefaults[id]);
   }
 
+  // Playback writes many tracked controls per frame. settings.js saves on a
+  // debounce after any of them changes, so without a way to stand down, a
+  // scrub would hammer localStorage with intermediate states nobody asked to
+  // keep - and the last one written would win, leaving the saved session
+  // showing wherever the playhead happened to stop.
+  let suspended = false;
+
   function reset() {
     for (const field of FIELDS) writeField(field, shippedDefaults[field.id]);
     post.setStyleOrder(shippedStyleOrder);
@@ -306,6 +313,9 @@ export function createSettings({ accordion, tabs, orientation, post }) {
   function watch() {
     let saveTimer = null;
     const scheduleSave = () => {
+      // Playback and scrubbing write tracked controls every frame; see the
+      // suspended flag above for why those must not be saved.
+      if (suspended) return;
       clearTimeout(saveTimer);
       // Debounced past a single drag: a slider fires 'input' on every pixel of
       // movement, and saving to localStorage on each one is wasted work.
@@ -325,5 +335,45 @@ export function createSettings({ accordion, tabs, orientation, post }) {
     }
   }
 
-  return { save, load, watch, reset, isAtDefault };
+  return {
+    save,
+    load,
+    watch,
+    reset,
+    isAtDefault,
+
+    /** The kind of a tracked field, or undefined if it is not tracked. */
+    fieldKind(id) {
+      return FIELD_BY_ID.get(id)?.kind;
+    },
+
+    /** Every tracked field id, for a keyframe UI to offer. */
+    fieldIds() {
+      return FIELDS.map((f) => f.id);
+    },
+
+    readFieldById(id) {
+      const field = FIELD_BY_ID.get(id);
+      return field ? readField(field) : undefined;
+    },
+
+    /**
+     * Write a value through the same path load() and reset() use, so every
+     * apply path, readout and dependent row updates exactly as it would for a
+     * real edit.
+     */
+    writeFieldById(id, value) {
+      const field = FIELD_BY_ID.get(id);
+      if (field) writeField(field, value);
+    },
+
+    /** Stop auto-saving. Paired with resume(); see the flag's own comment. */
+    suspend() {
+      suspended = true;
+    },
+
+    resume() {
+      suspended = false;
+    },
+  };
 }
