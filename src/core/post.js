@@ -70,42 +70,47 @@ import { createPixelSortShader } from './passes/pixel-sort-pass.js';
 import { createHalftoneShader, setHalftoneMode } from './passes/halftone-pass.js';
 import { createFilmShader, applyFilmPreset } from './passes/film-pass.js';
 
-/** Passes are imported on first enable, not at module load. */
+/**
+ * Passes are imported on first enable, not at module load.
+ *
+ * One entry per pass, and that entry is the only place the pass is named.
+ * Adding one used to mean editing three parallel lists - the destructuring of
+ * the Promise.all result, the object they were assembled into, and build()'s
+ * own destructuring - and every pass added since this file was written missed
+ * at least one of them. BokehPass, LUTPass and OutlinePass each shipped
+ * throwing "X is not defined" on first use, and the fix for the last one
+ * silently knocked GlitchPass out of a list it was not supposed to touch.
+ *
+ * The import specifiers stay written out in full rather than built from the
+ * key. A template literal would let Vite treat this as a glob and bundle every
+ * file in three's postprocessing folder, which is roughly thirty modules for
+ * the twelve actually used here. Static specifiers keep the chunking honest.
+ *
+ * Each of three's modules exports a class named after its file, which is what
+ * makes the key do double duty as both the map key and the export name.
+ */
+const PASS_LOADERS = {
+  EffectComposer: () => import('three/addons/postprocessing/EffectComposer.js'),
+  RenderPass: () => import('three/addons/postprocessing/RenderPass.js'),
+  GTAOPass: () => import('three/addons/postprocessing/GTAOPass.js'),
+  SMAAPass: () => import('three/addons/postprocessing/SMAAPass.js'),
+  OutputPass: () => import('three/addons/postprocessing/OutputPass.js'),
+  ShaderPass: () => import('three/addons/postprocessing/ShaderPass.js'),
+  UnrealBloomPass: () => import('three/addons/postprocessing/UnrealBloomPass.js'),
+  LUTPass: () => import('three/addons/postprocessing/LUTPass.js'),
+  OutlinePass: () => import('three/addons/postprocessing/OutlinePass.js'),
+  GlitchPass: () => import('three/addons/postprocessing/GlitchPass.js'),
+  AfterimagePass: () => import('three/addons/postprocessing/AfterimagePass.js'),
+  BokehPass: () => import('three/addons/postprocessing/BokehPass.js'),
+};
+
 let modules = null;
 
 async function loadModules() {
   if (modules) return modules;
-  const [
-    { EffectComposer },
-    { RenderPass },
-    { GTAOPass },
-    { SMAAPass },
-    { OutputPass },
-    { ShaderPass },
-    { UnrealBloomPass },
-    { LUTPass },
-    { OutlinePass },
-    { GlitchPass },
-    { AfterimagePass },
-    { BokehPass },
-  ] = await Promise.all([
-    import('three/addons/postprocessing/EffectComposer.js'),
-    import('three/addons/postprocessing/RenderPass.js'),
-    import('three/addons/postprocessing/GTAOPass.js'),
-    import('three/addons/postprocessing/SMAAPass.js'),
-    import('three/addons/postprocessing/OutputPass.js'),
-    import('three/addons/postprocessing/ShaderPass.js'),
-    import('three/addons/postprocessing/UnrealBloomPass.js'),
-    import('three/addons/postprocessing/LUTPass.js'),
-    import('three/addons/postprocessing/OutlinePass.js'),
-    import('three/addons/postprocessing/GlitchPass.js'),
-    import('three/addons/postprocessing/AfterimagePass.js'),
-    import('three/addons/postprocessing/BokehPass.js'),
-  ]);
-  modules = {
-    EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass,
-    OutlinePass, GlitchPass, AfterimagePass, BokehPass,
-  };
+  const names = Object.keys(PASS_LOADERS);
+  const loaded = await Promise.all(names.map((name) => PASS_LOADERS[name]()));
+  modules = Object.fromEntries(names.map((name, i) => [name, loaded[i][name]]));
   return modules;
 }
 
@@ -228,21 +233,20 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   }
 
   async function build(width, height) {
-    const {
-      EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass,
-      OutlinePass, GlitchPass,
-      AfterimagePass, BokehPass,
-    } = await loadModules();
+    // Read off the map rather than destructuring: a destructuring list here is
+    // a fourth place to forget a pass, which is exactly how this went wrong
+    // three times. See PASS_LOADERS.
+    const three = await loadModules();
     if (composer) return;
 
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
+    composer = new three.EffectComposer(renderer);
+    composer.addPass(new three.RenderPass(scene, camera));
 
-    gtaoPass = new GTAOPass(scene, camera, width, height);
+    gtaoPass = new three.GTAOPass(scene, camera, width, height);
     gtaoPass.enabled = aoEnabled;
     composer.addPass(gtaoPass);
 
-    smaaPass = new SMAAPass();
+    smaaPass = new three.SMAAPass();
     smaaPass.enabled = aaEnabled;
     composer.addPass(smaaPass);
 
@@ -254,7 +258,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // blur against - a CRT-scanlined or ASCII-glyphed frame has thrown that
     // information away - so it would be blurring an image that no longer
     // corresponds to the geometry it is sampling depth from.
-    dofPass = new BokehPass(scene, camera, {
+    dofPass = new three.BokehPass(scene, camera, {
       focus: dofFocus,
       aperture: dofAperture,
       maxblur: dofMaxBlur,
@@ -265,7 +269,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // After DOF so the outline is drawn crisp rather than being blurred along
     // with everything else - an out-of-focus outline reads as a rendering
     // artefact, not as a style.
-    outlinePass = new OutlinePass(new Vector2(width, height), scene, camera);
+    outlinePass = new three.OutlinePass(new Vector2(width, height), scene, camera);
     outlinePass.enabled = outlineEnabled;
     // Selection-highlight defaults turned off: this is drawing a line around a
     // subject, not pulsing to show what is picked.
@@ -287,24 +291,24 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // Glitch after CRT: reads as the CRT signal itself breaking up (a
     // struggling TV) rather than a corrupted source feed underneath a
     // working CRT - the more common real-world reference.
-    passes.bloom = new UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
-    passes.colorGrade = new ShaderPass(createColorGradeShader());
-    passes.lut = new LUTPass();
-    passes.tone = new ShaderPass(createToneShader());
-    passes.pixelate = new ShaderPass(createPixelateShader());
-    passes.dither = new ShaderPass(createDitherShader());
-    passes.pixelSort = new ShaderPass(createPixelSortShader());
-    passes.voronoi = new ShaderPass(createVoronoiShader());
-    passes.kuwahara = new ShaderPass(createKuwaharaShader());
-    passes.palette = new ShaderPass(createPaletteShader());
-    passes.halftone = new ShaderPass(createHalftoneShader());
-    passes.repeat = new ShaderPass(createRepeatShader());
-    passes.displace = new ShaderPass(createDisplaceShader());
-    passes.afterimage = new AfterimagePass(); // real damp set by applyAfterimage() below
-    passes.ascii = new ShaderPass(createAsciiShader());
-    passes.crt = new ShaderPass(createCrtShader());
-    passes.film = new ShaderPass(createFilmShader());
-    passes.glitch = new GlitchPass();
+    passes.bloom = new three.UnrealBloomPass(new Vector2(width, height), bloomStrength, bloomRadius, bloomThreshold);
+    passes.colorGrade = new three.ShaderPass(createColorGradeShader());
+    passes.lut = new three.LUTPass();
+    passes.tone = new three.ShaderPass(createToneShader());
+    passes.pixelate = new three.ShaderPass(createPixelateShader());
+    passes.dither = new three.ShaderPass(createDitherShader());
+    passes.pixelSort = new three.ShaderPass(createPixelSortShader());
+    passes.voronoi = new three.ShaderPass(createVoronoiShader());
+    passes.kuwahara = new three.ShaderPass(createKuwaharaShader());
+    passes.palette = new three.ShaderPass(createPaletteShader());
+    passes.halftone = new three.ShaderPass(createHalftoneShader());
+    passes.repeat = new three.ShaderPass(createRepeatShader());
+    passes.displace = new three.ShaderPass(createDisplaceShader());
+    passes.afterimage = new three.AfterimagePass(); // real damp set by applyAfterimage() below
+    passes.ascii = new three.ShaderPass(createAsciiShader());
+    passes.crt = new three.ShaderPass(createCrtShader());
+    passes.film = new three.ShaderPass(createFilmShader());
+    passes.glitch = new three.GlitchPass();
 
     for (const key of STYLE_KEYS) {
       passes[key].enabled = styleEnabled[key];
@@ -314,7 +318,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // Must be last: it performs tone mapping and the sRGB conversion that the
     // renderer would otherwise do on its own. Reads renderer.toneMapping
     // itself, unmodified by anything above it — see the file header.
-    const outputPass = new OutputPass();
+    const outputPass = new three.OutputPass();
     composer.addPass(outputPass);
 
     applyAO();

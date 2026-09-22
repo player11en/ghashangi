@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "vite",
     "dev:https": "vite --host --mode https",
-    "check": "node scripts/check-refs.mjs && node scripts/check-dom-ids.mjs",
+    "check": "node scripts/check-refs.mjs && node scripts/check-dom-ids.mjs && node scripts/check-syntax.mjs",
     "prebuild": "npm run check",
     "build": "vite build",
     "build:maps": "vite build --mode maps",
