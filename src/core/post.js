@@ -63,6 +63,8 @@ import { createDisplaceShader, setDisplaceMode } from './passes/displace-pass.js
 import { createAsciiShader, setAsciiRamp } from './passes/ascii-pass.js';
 import { createPixelateShader } from './passes/pixelate-pass.js';
 import { createPresetLut } from './passes/lut-pass.js';
+import { createVoronoiShader, setVoronoiMode } from './passes/voronoi-pass.js';
+import { createKuwaharaShader } from './passes/kuwahara-pass.js';
 import { createHalftoneShader, setHalftoneMode } from './passes/halftone-pass.js';
 import { createFilmShader, applyFilmPreset } from './passes/film-pass.js';
 
@@ -110,8 +112,8 @@ async function loadModules() {
 // Bloom/CRT/Glitch kept their original relative slots as the default; the
 // five Track 5.3 additions land between Bloom and CRT, per the plan.
 const STYLE_KEYS = [
-  'bloom', 'colorGrade', 'lut', 'tone', 'pixelate', 'palette', 'halftone', 'repeat', 'displace',
-  'afterimage', 'ascii', 'crt', 'film', 'glitch',
+  'bloom', 'colorGrade', 'lut', 'tone', 'kuwahara', 'pixelate', 'palette', 'halftone', 'voronoi',
+  'repeat', 'displace', 'afterimage', 'ascii', 'crt', 'film', 'glitch',
 ];
 
 /**
@@ -130,9 +132,9 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   // variable each, since reorderStyle() needs to address them generically.
   const passes = {};
   const styleEnabled = {
-    bloom: false, colorGrade: false, lut: false, tone: false, pixelate: false, palette: false,
-    halftone: false, repeat: false, displace: false, afterimage: false, ascii: false,
-    crt: false, film: false, glitch: false,
+    bloom: false, colorGrade: false, lut: false, tone: false, kuwahara: false, pixelate: false,
+    palette: false, halftone: false, voronoi: false, repeat: false, displace: false,
+    afterimage: false, ascii: false, crt: false, film: false, glitch: false,
   };
   let styleOrder = [...STYLE_KEYS];
 
@@ -254,6 +256,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     passes.lut = new LUTPass();
     passes.tone = new ShaderPass(createToneShader());
     passes.pixelate = new ShaderPass(createPixelateShader());
+    passes.voronoi = new ShaderPass(createVoronoiShader());
+    passes.kuwahara = new ShaderPass(createKuwaharaShader());
     passes.palette = new ShaderPass(createPaletteShader());
     passes.halftone = new ShaderPass(createHalftoneShader());
     passes.repeat = new ShaderPass(createRepeatShader());
@@ -341,6 +345,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     if (passes.crt) passes.crt.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.palette) passes.palette.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.pixelate) passes.pixelate.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.voronoi) passes.voronoi.uniforms.uResolution.value = [pixelWidth, pixelHeight];
+    if (passes.kuwahara) passes.kuwahara.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.tone) passes.tone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.ascii) passes.ascii.uniforms.uResolution.value = [pixelWidth, pixelHeight];
     if (passes.halftone) passes.halftone.uniforms.uResolution.value = [pixelWidth, pixelHeight];
@@ -675,6 +681,31 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
     setPixelateParam(name, value) {
       if (passes.pixelate?.uniforms[name]) passes.pixelate.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    // --- Voronoi / Kuwahara (Phase 9) -------------------------------------
+
+    setVoronoi(enabled) {
+      return setStyleEnabled('voronoi', enabled);
+    },
+
+    setVoronoiMode(name) {
+      if (passes.voronoi) setVoronoiMode(passes.voronoi, name);
+      invalidate(2);
+    },
+
+    setVoronoiParam(name, value) {
+      if (passes.voronoi?.uniforms[name]) passes.voronoi.uniforms[name].value = value;
+      invalidate(2);
+    },
+
+    setKuwahara(enabled) {
+      return setStyleEnabled('kuwahara', enabled);
+    },
+
+    setKuwaharaParam(name, value) {
+      if (passes.kuwahara?.uniforms[name]) passes.kuwahara.uniforms[name].value = value;
       invalidate(2);
     },
 

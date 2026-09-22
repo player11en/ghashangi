@@ -734,6 +734,8 @@ function syncStyleRows() {
     ['crtToggle', '[data-crt]'],
     ['bloomToggle', '[data-bloom]'],
     ['lutToggle', '[data-lut]'],
+    ['voronoiToggle', '[data-voronoi]'],
+    ['kuwaharaToggle', '[data-kuwahara]'],
     ['pixelateToggle', '[data-pixelate]'],
     ['glitchToggle', '[data-glitch]'],
     ['paletteToggle', '[data-palette]'],
@@ -793,13 +795,15 @@ function checkStyleCost() {
 // not drag-and-drop - keeps this keyboard/screen-reader accessible without
 // extra work, matching every other control in this app.
 const STYLE_LABELS = {
-  bloom: 'Bloom', colorGrade: 'Color grade', lut: 'LUT', tone: 'Tone', pixelate: 'Pixelate',
+  bloom: 'Bloom', colorGrade: 'Color grade', lut: 'LUT', tone: 'Tone',
+  kuwahara: 'Painterly', voronoi: 'Voronoi', pixelate: 'Pixelate',
   palette: 'Retro palette',
   halftone: 'Halftone / print', repeat: 'Repeat', displace: 'Glitch displace', afterimage: 'Trails',
   ascii: 'ASCII', crt: 'CRT', film: 'Film', glitch: 'Glitch',
 };
 const STYLE_TOGGLE_IDS = {
   bloom: 'bloomToggle', colorGrade: 'colorGradeToggle', lut: 'lutToggle', tone: 'toneToggle',
+  kuwahara: 'kuwaharaToggle', voronoi: 'voronoiToggle',
   pixelate: 'pixelateToggle', palette: 'paletteToggle',
   halftone: 'halftoneToggle', repeat: 'repeatToggle', displace: 'displaceToggle',
   afterimage: 'afterimageToggle', ascii: 'asciiToggle', crt: 'crtToggle', film: 'filmToggle',
@@ -939,6 +943,46 @@ bindCheckbox('pixelateToggle', async (on) => {
 bindSlider('pixelateSize', (v) => viewer.post.setPixelateParam('pixelSize', v), (v) => `${v}px`);
 bindSlider('pixelateAspect', (v) => viewer.post.setPixelateParam('aspect', v), fixed2);
 bindSlider('pixelateGrid', (v) => viewer.post.setPixelateParam('gridStrength', v), fixed2);
+
+bindCheckbox('voronoiToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setVoronoi(on);
+    renderStyleOrder();
+    if (on) checkStyleCost();
+  } catch (error) {
+    console.error('[Ghashangi] voronoi failed to initialise', error);
+    toasts.error('Could not enable Voronoi', String(error.message));
+    $('voronoiToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('voronoiMode').addEventListener('change', (e) => viewer.post.setVoronoiMode(e.target.value));
+bindSlider('voronoiCellSize', (v) => viewer.post.setVoronoiParam('cellSize', v), (v) => `${v}px`);
+bindSlider('voronoiJitter', (v) => viewer.post.setVoronoiParam('jitter', v), fixed2);
+bindSlider('voronoiShatter', (v) => viewer.post.setVoronoiParam('shatter', v), fixed2);
+$('voronoiEdgeColor').addEventListener('input', (e) => {
+  viewer.post.setVoronoiParam('edgeColor', hexToRgbArray(e.target.value));
+});
+
+bindCheckbox('kuwaharaToggle', async (on) => {
+  markStyleTouched();
+  syncStyleRows();
+  try {
+    await viewer.post.setKuwahara(on);
+    renderStyleOrder();
+    if (on) checkStyleCost();
+  } catch (error) {
+    console.error('[Ghashangi] painterly failed to initialise', error);
+    toasts.error('Could not enable Painterly', String(error.message));
+    $('kuwaharaToggle').checked = false;
+    syncStyleRows();
+  }
+});
+bindSlider('kuwaharaRadius', (v) => viewer.post.setKuwaharaParam('radius', v), (v) => String(v));
+bindSlider('kuwaharaStrength', (v) => viewer.post.setKuwaharaParam('strength', v), fixed2);
+bindSlider('kuwaharaPunch', (v) => viewer.post.setKuwaharaParam('punch', v), fixed2);
 
 bindCheckbox('lutToggle', async (on) => {
   markStyleTouched();

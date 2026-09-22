@@ -480,6 +480,56 @@ await page.evaluate(async () => { await window.__viewer.post.setAscii(false); })
 await page.evaluate(async () => { await window.__viewer.post.setHalftone(true); });
 await settle();
 const halftoneDots = await viewportHash();
+// Voronoi (Phase 9). One cell shader, three readings of the same
+// nearest-site answer: paint the cell, draw its boundary, or displace it.
+await page.evaluate(async () => { await window.__viewer.post.setVoronoi(true); });
+await settle(800);
+const voronoiMosaic = await viewportHash();
+check('Voronoi changes the rendered image', voronoiMosaic !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setVoronoiMode('glass'));
+await settle();
+const voronoiGlass = await viewportHash();
+check('stained glass differs from mosaic', voronoiGlass !== voronoiMosaic);
+
+await page.evaluate(() => window.__viewer.post.setVoronoiMode('shatter'));
+await settle();
+check('shatter differs from stained glass', (await viewportHash()) !== voronoiGlass);
+
+await page.evaluate(() => window.__viewer.post.setVoronoiParam('cellSize', 80));
+await settle();
+check('Voronoi cell size is a real dial', (await viewportHash()) !== voronoiGlass);
+
+await page.evaluate(async () => {
+  window.__viewer.post.setVoronoiMode('mosaic');
+  window.__viewer.post.setVoronoiParam('cellSize', 28);
+  await window.__viewer.post.setVoronoi(false);
+});
+await settle();
+
+// Kuwahara (Phase 9). The edge-preserving painterly filter - and the one pass
+// whose cost scales with the square of a user-facing slider, which is why its
+// radius is capped at 8 in both the shader and the UI.
+await page.evaluate(async () => { await window.__viewer.post.setKuwahara(true); });
+await settle(800);
+const painterly = await viewportHash();
+check('Painterly changes the rendered image', painterly !== baseline);
+
+await page.evaluate(() => window.__viewer.post.setKuwaharaParam('radius', 8));
+await settle();
+check('Painterly brush size is a real dial', (await viewportHash()) !== painterly);
+
+await page.evaluate(() => window.__viewer.post.setKuwaharaParam('strength', 0));
+await settle();
+check('Painterly amount 0 differs from full', (await viewportHash()) !== painterly);
+
+await page.evaluate(async () => {
+  window.__viewer.post.setKuwaharaParam('radius', 4);
+  window.__viewer.post.setKuwaharaParam('strength', 1);
+  await window.__viewer.post.setKuwahara(false);
+});
+await settle();
+
 // LUT (Phase 9). three ships LUTPass and three LUT loaders and none of them
 // had ever been used here. The reason this earns a place next to the
 // colour-grade pass rather than replacing it: a .cube file is what a colourist

@@ -927,6 +927,8 @@ export function createViewer({ container }) {
         post.setCrt(false);
         post.setPixelate(false);
         post.setLut(false);
+        post.setVoronoi(false);
+        post.setKuwahara(false);
         post.setPalette(false);
         post.setColorGrade(false);
         post.setTone(false);

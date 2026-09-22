@@ -492,6 +492,62 @@
             <label for="glitchWild">Wild mode</label>
           </div>
           <div class="row row-check">
+            <input type="checkbox" id="voronoiToggle">
+            <label for="voronoiToggle">Voronoi</label>
+          </div>
+          <div class="row" data-voronoi>
+            <label for="voronoiMode">Cells</label>
+            <select id="voronoiMode">
+              <option value="mosaic" selected>Mosaic</option>
+              <option value="glass">Stained glass</option>
+              <option value="shatter">Shatter</option>
+            </select>
+          </div>
+          <div class="row" data-voronoi data-advanced>
+            <label for="voronoiCellSize">Cell size</label>
+            <input type="range" id="voronoiCellSize" min="6" max="120" step="1" value="28">
+            <input type="text" inputmode="numeric" class="value-input" id="voronoiCellSizeOut" value="28px" aria-label="Voronoi cell size">
+          </div>
+          <div class="row" data-voronoi data-advanced>
+            <label for="voronoiJitter">Irregularity</label>
+            <input type="range" id="voronoiJitter" min="0" max="1" step="0.02" value="0.85">
+            <input type="text" inputmode="decimal" class="value-input" id="voronoiJitterOut" value="0.85" aria-label="Voronoi irregularity">
+          </div>
+          <div class="row" data-voronoi data-advanced>
+            <label for="voronoiShatter">Shatter</label>
+            <input type="range" id="voronoiShatter" min="0" max="1" step="0.02" value="0.35">
+            <input type="text" inputmode="decimal" class="value-input" id="voronoiShatterOut" value="0.35" aria-label="Voronoi shatter amount">
+          </div>
+          <div class="row" data-voronoi data-advanced>
+            <label for="voronoiEdgeColor">Seam color</label>
+            <input type="color" id="voronoiEdgeColor" value="#050508">
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="kuwaharaToggle">
+            <label for="kuwaharaToggle" title="Edge-preserving painterly filter. Costly at large radii.">Painterly</label>
+          </div>
+          <div class="row" data-kuwahara data-advanced>
+            <label for="kuwaharaRadius">Brush size</label>
+            <input type="range" id="kuwaharaRadius" min="1" max="8" step="1" value="4">
+            <input type="text" inputmode="numeric" class="value-input" id="kuwaharaRadiusOut" value="4" aria-label="Painterly brush size">
+          </div>
+          <div class="row" data-kuwahara data-advanced>
+            <label for="kuwaharaStrength">Amount</label>
+            <input type="range" id="kuwaharaStrength" min="0" max="1" step="0.02" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="kuwaharaStrengthOut" value="1.00" aria-label="Painterly amount">
+          </div>
+          <div class="row" data-kuwahara data-advanced>
+            <label for="kuwaharaPunch">Punch</label>
+            <input type="range" id="kuwaharaPunch" min="0" max="1" step="0.02" value="0.3">
+            <input type="text" inputmode="decimal" class="value-input" id="kuwaharaPunchOut" value="0.30" aria-label="Painterly punch">
+          </div>
+          <p class="hint" data-kuwahara data-advanced>
+            Samples the neighbourhood squared, so brush size is the expensive
+            dial here — turn it down first if the frame rate drops.
+          </p>
+
+          <div class="row row-check">
             <input type="checkbox" id="pixelateToggle">
             <label for="pixelateToggle">Pixelate</label>
           </div>
