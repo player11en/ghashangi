@@ -368,6 +368,52 @@ check('reset restores slider values', resetState.ambient === '0.3' && resetState
 check('reset restores colour pickers', resetState.leftColor === '#b2b2ff', resetState.leftColor);
 check('reset returns the image to the baseline exactly', (await viewportHash()) === baseline);
 
+// --- outline (Phase 9) ----------------------------------------------------
+//
+// A fidelity-band pass, not a Style one, for the same reason DOF is: it
+// re-renders the subject's silhouette from the real scene, which no longer
+// exists once a Style pass has turned the image into glyphs or cells. So it
+// lives in the fixed prefix and never joins the reorderable band - which is
+// what the "coexists with a Style pass" check below is really asserting.
+//
+// It also reaches something Sobel edges in tone-pass.js structurally cannot:
+// a light model on a light backdrop has no luminance contrast to find, but
+// still has a silhouette.
+
+console.log('\nOutline');
+
+await page.evaluate(async () => { await window.__viewer.post.setOutline(true); });
+await settle(900);
+const outlineOn = await viewportHash();
+check('Outline changes the rendered image', outlineOn !== baseline);
+check('composer is active with outline alone', await page.evaluate(() => window.__viewer.post.active));
+
+await page.evaluate(() => window.__viewer.post.setOutlineThickness(6));
+await settle();
+check('Outline thickness is a real dial', (await viewportHash()) !== outlineOn);
+
+await page.evaluate(() => {
+  const p = window.__viewer.post;
+  p.setOutlineThickness(1.5);
+  p.setOutlineColor('#ff0000');
+});
+await settle();
+check('Outline colour is a real dial', (await viewportHash()) !== outlineOn);
+
+await page.evaluate(() => window.__viewer.post.setOutlineColor('#101018'));
+await settle();
+await page.evaluate(async () => { await window.__viewer.post.setDither(true); });
+await settle(900);
+const outlineWithStyle = await viewportHash();
+check('Outline coexists with a Style pass', outlineWithStyle !== outlineOn && outlineWithStyle !== baseline);
+
+await page.evaluate(async () => {
+  await window.__viewer.post.setDither(false);
+  await window.__viewer.post.setOutline(false);
+});
+await settle();
+check('toggling Outline off restores the original image exactly', (await viewportHash()) === baseline);
+
 // --- style effects (Track 4.3/4.4) ----------------------------------------
 //
 // Same fallback guarantee as AO: cycling every Style effect on and back off

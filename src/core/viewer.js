@@ -244,6 +244,12 @@ export function createViewer({ container }) {
     invalidate: (frames) => loop.invalidate(frames),
   });
 
+  // The outline is drawn around whatever lives in modelRoot. Set once rather
+  // than per load: models are added *inside* this group, never in place of it,
+  // so the target never goes stale - and OutlinePass traverses what it is
+  // given, so the group is enough without listing meshes.
+  post.setOutlineTarget(modelRoot);
+
   const environment = createEnvironment({
     scene,
     renderer,
@@ -916,6 +922,7 @@ export function createViewer({ container }) {
         post.setAO(false);
         post.setAA(false);
         post.setDof(false);
+        post.setOutline(false);
         // Same rule extended to Track 4's Style stack: four more full-screen
         // passes on top of GTAO+SMAA is real cost, and a device that just had
         // AO/AA forced off for performance shouldn't have Style effects

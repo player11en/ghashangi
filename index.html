@@ -413,6 +413,28 @@
           <!-- Depth of field sits with AO/AA rather than in Style: it is a
                lens property of the real 3D scene, and it reads scene depth,
                which only exists ahead of any stylization pass. -->
+          <!-- Fidelity band, like DOF above: OutlinePass re-renders the
+               subject's silhouette from the real scene, which no longer exists
+               once a Style pass has turned the image into glyphs or cells. -->
+          <div class="row row-check">
+            <input type="checkbox" id="outlineToggle">
+            <label for="outlineToggle" title="Draw a clean line around the subject's silhouette, independent of lighting contrast">Outline</label>
+          </div>
+          <div class="row" data-outline>
+            <label for="outlineColor">Line color</label>
+            <input type="color" id="outlineColor" value="#101018">
+          </div>
+          <div class="row" data-outline data-advanced>
+            <label for="outlineThickness">Line width</label>
+            <input type="range" id="outlineThickness" min="0.5" max="6" step="0.1" value="1.5">
+            <input type="text" inputmode="decimal" class="value-input" id="outlineThicknessOut" value="1.5" aria-label="Outline thickness">
+          </div>
+          <div class="row" data-outline data-advanced>
+            <label for="outlineStrength">Line strength</label>
+            <input type="range" id="outlineStrength" min="0.5" max="10" step="0.1" value="3">
+            <input type="text" inputmode="decimal" class="value-input" id="outlineStrengthOut" value="3.0" aria-label="Outline strength">
+          </div>
+
           <div class="row row-check">
             <input type="checkbox" id="dofToggle">
             <label for="dofToggle">Depth of field</label>

@@ -736,6 +736,7 @@ function syncStyleRows() {
     ['lutToggle', '[data-lut]'],
     ['voronoiToggle', '[data-voronoi]'],
     ['ditherToggle', '[data-dither]'],
+    ['outlineToggle', '[data-outline]'],
     ['kuwaharaToggle', '[data-kuwahara]'],
     ['pixelateToggle', '[data-pixelate]'],
     ['glitchToggle', '[data-glitch]'],
@@ -966,6 +967,21 @@ bindSlider('voronoiShatter', (v) => viewer.post.setVoronoiParam('shatter', v), f
 $('voronoiEdgeColor').addEventListener('input', (e) => {
   viewer.post.setVoronoiParam('edgeColor', hexToRgbArray(e.target.value));
 });
+
+bindCheckbox('outlineToggle', async (on) => {
+  syncStyleRows();
+  try {
+    await viewer.post.setOutline(on);
+  } catch (error) {
+    console.error('[Ghashangi] outline failed to initialise', error);
+    toasts.error('Could not enable the outline', String(error.message));
+    $('outlineToggle').checked = false;
+    syncStyleRows();
+  }
+});
+$('outlineColor').addEventListener('input', (e) => viewer.post.setOutlineColor(e.target.value));
+bindSlider('outlineThickness', (v) => viewer.post.setOutlineThickness(v), fixed1);
+bindSlider('outlineStrength', (v) => viewer.post.setOutlineStrength(v), fixed1);
 
 bindCheckbox('ditherToggle', async (on) => {
   markStyleTouched();

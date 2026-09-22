@@ -83,6 +83,7 @@ async function loadModules() {
     { ShaderPass },
     { UnrealBloomPass },
     { LUTPass },
+    { OutlinePass },
     { GlitchPass },
     { AfterimagePass },
     { BokehPass },
@@ -95,13 +96,14 @@ async function loadModules() {
     import('three/addons/postprocessing/ShaderPass.js'),
     import('three/addons/postprocessing/UnrealBloomPass.js'),
     import('three/addons/postprocessing/LUTPass.js'),
+    import('three/addons/postprocessing/OutlinePass.js'),
     import('three/addons/postprocessing/GlitchPass.js'),
     import('three/addons/postprocessing/AfterimagePass.js'),
     import('three/addons/postprocessing/BokehPass.js'),
   ]);
   modules = {
-    EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass, GlitchPass,
-    AfterimagePass, BokehPass,
+    EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass,
+    OutlinePass, GlitchPass, AfterimagePass, BokehPass,
   };
   return modules;
 }
@@ -143,6 +145,22 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let aaEnabled = false;
   let dofEnabled = false;
   let dofPass = null;
+
+  // Outline is a fidelity-band pass, not a Style one, for the same reason DOF
+  // is: it needs the real scene and camera to re-render the subject's
+  // silhouette, which no longer exists once a Style pass has rewritten the
+  // image into glyphs or cells. It sits in the fixed prefix and never joins
+  // the reorderable band.
+  let outlineEnabled = false;
+  let outlinePass = null;
+  let outlineColor = '#101018';
+  let outlineThickness = 1.5;
+  let outlineStrength = 3;
+  // What to draw a line around. Set once by viewer.js to the model root, which
+  // is stable across loads (models are added inside it, not in place of it),
+  // so this never needs re-pointing per model. OutlinePass traverses whatever
+  // it is given, so a Group is enough - it does not need the meshes listed.
+  let outlineTarget = null;
 
   // Focus is a world-space distance along the camera's look direction, so a
   // sane default depends entirely on how far the camera sits from the
@@ -198,7 +216,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   /** True when any effect wants the composer. */
   function active() {
-    return aoEnabled || aaEnabled || dofEnabled || Object.values(styleEnabled).some(Boolean);
+    return aoEnabled || aaEnabled || dofEnabled || outlineEnabled
+      || Object.values(styleEnabled).some(Boolean);
   }
 
   /** How many Style (non-fidelity) effects are currently on - see setSize's caller in Track 5.1. */
@@ -208,7 +227,8 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
   async function build(width, height) {
     const {
-      EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass, GlitchPass,
+      EffectComposer, RenderPass, GTAOPass, SMAAPass, OutputPass, ShaderPass, UnrealBloomPass, LUTPass,
+      OutlinePass, GlitchPass,
       AfterimagePass, BokehPass,
     } = await loadModules();
     if (composer) return;
@@ -239,6 +259,19 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     });
     dofPass.enabled = dofEnabled;
     composer.addPass(dofPass);
+
+    // After DOF so the outline is drawn crisp rather than being blurred along
+    // with everything else - an out-of-focus outline reads as a rendering
+    // artefact, not as a style.
+    outlinePass = new OutlinePass(new Vector2(width, height), scene, camera);
+    outlinePass.enabled = outlineEnabled;
+    // Selection-highlight defaults turned off: this is drawing a line around a
+    // subject, not pulsing to show what is picked.
+    outlinePass.edgeGlow = 0;
+    outlinePass.pulsePeriod = 0;
+    outlinePass.usePatternTexture = false;
+    composer.addPass(outlinePass);
+    applyOutline();
 
     // Default composite order below (STYLE_KEYS) is a starting point, not a
     // hard rule - reorderStyle() permutes it later. The reasoning that
@@ -318,7 +351,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // added to that prefix after this function, and anchoring to SMAA would
     // silently re-splice the whole Style band in front of it, inverting the
     // fidelity-then-style order every pass here depends on.
-    const lastFixed = dofPass ?? smaaPass;
+    const lastFixed = outlinePass ?? dofPass ?? smaaPass;
     const insertAt = composer.passes.indexOf(lastFixed) + 1;
     composer.passes = composer.passes.filter((p) => !styleInstances.has(p));
     composer.passes.splice(insertAt, 0, ...styleOrder.map((k) => passes[k]));
@@ -368,6 +401,19 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     if (!lutTexture) lutTexture = createPresetLut(lutPresetName);
     passes.lut.lut = lutTexture;
     passes.lut.intensity = lutIntensity;
+  }
+
+  function applyOutline() {
+    if (!outlinePass) return;
+    outlinePass.selectedObjects = outlineTarget ? [outlineTarget] : [];
+    outlinePass.visibleEdgeColor.set(outlineColor);
+    // Hidden edges are the parts of the silhouette behind other geometry.
+    // Matched to the visible colour rather than left at three's default brown,
+    // which exists to distinguish occluded selection highlights and reads as a
+    // bug when the intent is a drawn line.
+    outlinePass.hiddenEdgeColor.set(outlineColor);
+    outlinePass.edgeThickness = outlineThickness;
+    outlinePass.edgeStrength = outlineStrength;
   }
 
   function applyAfterimage() {
@@ -465,6 +511,41 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // --- depth of field (Track 6.1) ---------------------------------------
     // Fidelity, not stylization: it lives beside AO/AA in the Environment
     // group, and in the composer's fixed prefix. See build() for why.
+
+    /** Called once by viewer.js with the group every model is loaded into. */
+    setOutlineTarget(object) {
+      outlineTarget = object;
+      applyOutline();
+    },
+
+    async setOutline(enabled) {
+      outlineEnabled = enabled;
+      if (enabled && !composer) {
+        const size = currentSize();
+        await build(size.x, size.y);
+      }
+      if (outlinePass) outlinePass.enabled = enabled;
+      invalidate(2);
+      return enabled;
+    },
+
+    setOutlineColor(hex) {
+      outlineColor = hex;
+      applyOutline();
+      invalidate(2);
+    },
+
+    setOutlineThickness(value) {
+      outlineThickness = value;
+      applyOutline();
+      invalidate(2);
+    },
+
+    setOutlineStrength(value) {
+      outlineStrength = value;
+      applyOutline();
+      invalidate(2);
+    },
 
     async setDof(enabled) {
       dofEnabled = enabled;
@@ -791,6 +872,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       composer.setPixelRatio(renderer.getPixelRatio());
       gtaoPass?.setSize(width, height);
       dofPass?.setSize(width, height);
+      outlinePass?.setSize(width, height);
       passes.bloom?.setSize(width, height);
       applyResolutionUniforms(width, height);
     },
@@ -820,6 +902,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       gtaoPass?.dispose?.();
       smaaPass?.dispose?.();
       dofPass?.dispose?.();
+      outlinePass?.dispose?.();
       for (const key of STYLE_KEYS) {
         passes[key]?.dispose?.();
         passes[key] = null;
@@ -834,6 +917,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
       gtaoPass = null;
       smaaPass = null;
       dofPass = null;
+      outlinePass = null;
     },
   };
 }
