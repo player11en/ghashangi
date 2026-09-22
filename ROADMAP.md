@@ -81,48 +81,67 @@ Phase 9.
 
 ---
 
-## Phase 8 — Framing and composition feedback
+## Phase 8 — Framing and composition feedback — **SHIPPED**
 
-- **Render-frame overlay**, the thing Blender's camera passepartout does: dim
-  everything outside the export frame, live, while composing. The current
-  aspect lock physically shrinks the viewport, and only during an active
-  preview or recording, which is the wrong tool for "where will this crop".
-  The overlay is non-destructive: full resolution, full interactivity, guide
-  only.
-- **Aspect and resolution presets** beyond Free / 9:16 / 1:1 — 4:3, 21:9,
-  2:3, custom W:H, with output pixel dimensions stated rather than implied.
-- **Camera bookmarks** — front, three-quarter, top, back as one-click views,
-  separate from the camera-path animation. Lighter than keyframing for
-  someone who wants three consistent angles.
-- **Record from a locked-off camera** — a clip from the current view, or from
-  one saved waypoint held for the whole duration, with nothing moving but the
-  scene itself.
+Three of the four items done; the fourth turned out to be smaller than a
+bullet point once it was measured.
 
-  Currently impossible, and the gap is not obvious from the feature list:
-  turntable rotates the model, a camera path demands movement between at least
-  two waypoints, and a screenshot is one frame. There is no way to record the
-  thing a locked-off camera is *for* — a model playing its own animation clip,
-  or the time-varying Style passes (glitch, trails, displace, film grain, and
-  any keyframed parameter from Phase 10) which all produce motion on their own
-  without the camera doing anything.
+**Render-frame overlay** (`src/ui/frame-guide.js`). Dimmed bars marking where
+an export will crop, live, while composing — Blender's camera passepartout.
+Eight ratios: 9:16, 4:5, 1:1, 4:3, 3:2, 16:9, 21:9 and free, with the real
+output pixel size shown next to the ratio (multiplied by the screenshot scale,
+so the number is what a capture actually produces rather than something to
+work out).
 
-  **Cheapest item in this roadmap, verified rather than assumed.** Two things
-  already support it:
+Deliberately *not* the aspect lock in `aspect-lock.js`, which physically
+resizes the viewport: that is right for the moment a recording runs and wrong
+for everything before it, because it changes the canvas resolution and only
+exists while a preview or recording is active. This touches nothing — not the
+renderer, not the canvas, not the camera. Two guarantees are what make it a
+guide rather than an obstacle, and both have tests: it never appears in the
+exported image (asserted byte-identical), and it never intercepts a pointer
+event (`pointer-events: none`, with an actual drag-to-orbit through it in the
+suite).
 
-  - `recorder.js`'s `onFrame` already defaults to a no-op, so
-    `recordClip()` with no per-frame callback records a static camera today.
-    The generic recorder needs no changes at all.
-  - `camera-path.js`'s `evaluate()` already handles `waypoints.length === 1`
-    explicitly, returning that waypoint's position and target.
+One honest interaction worth knowing: the panel floats over the viewport, so
+the right edge of a wide frame sits behind it. The guide is still telling the
+truth — `lockAspect` centres a capture on the full window too, so the render
+really does extend under the panel — and offsetting the overlay to "look
+right" would make it lie about where the crop lands. Collapsing the panel
+shows the whole frame. If this proves annoying in practice the fix is a layout
+question (panel pushing the viewport rather than floating over it), not a
+change to the guide.
 
-  What blocks it is three explicit guards, nothing structural: `play()` and
-  `recordCameraPath()` both bail below two waypoints, and the panel disables
-  Preview and Record on the same condition. A one-waypoint path is a valid
-  static shot, not an incomplete move.
+**Five saved views.** Front, three-quarter, side, top and back, in the Model
+section. Built as a `direction` option on `frameCamera()` rather than new
+camera maths, so they inherit its fit distance, near/far derivation and
+OrbitControls limits. The test that matters asserts all five frame at the
+*same* distance — a view that drifts from that means the shared path got
+bypassed, which is the only way this rots.
 
-  Two entry points worth having, since they answer different questions:
-  "record what I am looking at right now" needs no waypoints at all, and
-  "record from the framing I saved earlier" is the relaxed one-waypoint path.
+Top is `(0, 1, 0.001)`, and the fraction is load-bearing: a view direction
+exactly parallel to the camera's up vector has no unique orientation, so
+`lookAt()` has nothing to solve. A test asserts the world matrix stays finite,
+because that is how the failure actually shows up.
+
+**Locked-off camera recording.** Two entry points: "Record current view",
+which needs no waypoints, and a one-waypoint camera path for "record from the
+framing I saved earlier". This closes a gap that was invisible in the feature
+list — the turntable rotates the model, a camera path demanded movement, a
+screenshot is one frame, so the shot a still camera exists for was
+unreachable. That matters most for a model playing its own animation clip and
+for the time-varying Style passes, all of which move on their own.
+
+Checking before estimating paid off here: `recordClip()`'s `onFrame` already
+defaulted to a no-op and `evaluate()` already handled a single waypoint, so
+what blocked it was three `< 2` guards. `recordStatic()` is nine lines, and
+the only genuinely new behaviour in it is pausing auto-rotate for the duration
+— "locked off" has to mean locked off, or it is a turntable with extra steps.
+
+**Not done: custom W:H.** The eight presets cover what things are actually
+exported for, and an arbitrary ratio field is a text-input-validation feature
+rather than a framing one. Worth adding if a real need for an odd ratio turns
+up; not worth it on speculation.
 
 ---
 

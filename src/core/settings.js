@@ -49,6 +49,8 @@ const FIELDS = [
   { id: 'dofFocus', kind: 'range' },
   { id: 'dofAperture', kind: 'range' },
   { id: 'dofMaxBlur', kind: 'range' },
+  { id: 'frameGuideToggle', kind: 'checkbox' },
+  { id: 'frameGuideRatio', kind: 'select' },
   { id: 'qualityTier', kind: 'select' },
   { id: 'simplifyToggle', kind: 'checkbox' },
   { id: 'simplifyBudget', kind: 'range' },

@@ -8,6 +8,7 @@ import { createMaterialsPanel } from './ui/materials-panel.js';
 import { createAnimationPanel } from './ui/animation-panel.js';
 import { createAccordion } from './ui/accordion.js';
 import { createTabs } from './ui/tabs.js';
+import { createFrameGuide } from './ui/frame-guide.js';
 import { createShortcuts } from './ui/shortcuts.js';
 import { createSettings } from './core/settings.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
@@ -75,6 +76,11 @@ const accordion = createAccordion($('panelBody'));
 const tabs = createTabs($('tabBar'), $('panelBody'));
 
 createShortcuts();
+
+// Overlays the viewport, so it is built against the same container the viewer
+// renders into. Purely visual - see frame-guide.js for why this is not the
+// aspect lock.
+const frameGuide = createFrameGuide($('viewport'));
 
 const settings = createSettings({
   accordion,
@@ -466,6 +472,36 @@ syncStageRows();
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
+
+// --- frame guide ---------------------------------------------------------
+
+/**
+ * Show the guide's real output size, rather than leaving "9:16" to be mentally
+ * multiplied out against the viewport. Reads the screenshot scale too, so the
+ * number is what a capture at the current settings would actually produce.
+ */
+function syncFrameGuide() {
+  const on = $('frameGuideToggle').checked;
+  for (const row of document.querySelectorAll('[data-frame-guide]')) row.hidden = !on;
+
+  const dims = frameGuide.dimensions();
+  const scale = parseFloat($('shotScale').value) || 1;
+  $('frameGuideHint').textContent = dims
+    ? `${Math.round(dims.width * scale)} × ${Math.round(dims.height * scale)} px — guide only, the render is unchanged.`
+    : 'Guide only — the render is unchanged.';
+}
+
+bindCheckbox('frameGuideToggle', (on) => {
+  frameGuide.setEnabled(on);
+  syncFrameGuide();
+});
+
+$('frameGuideRatio').addEventListener('change', (event) => {
+  frameGuide.setRatio(event.target.value);
+  syncFrameGuide();
+});
+
+syncFrameGuide();
 
 // Saved views. Delegated from the row rather than one listener per button,
 // since the set is markup-driven - adding a view means adding a button, not

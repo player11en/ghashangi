@@ -809,6 +809,26 @@
             <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
             <output for="shotScale" id="shotScaleOut">1×</output>
           </div>
+          <div class="row row-check">
+            <input type="checkbox" id="frameGuideToggle">
+            <label for="frameGuideToggle" title="Dim everything outside the export frame, without changing the render">Show frame guide</label>
+          </div>
+          <div class="row" data-frame-guide>
+            <label for="frameGuideRatio">Frame</label>
+            <select id="frameGuideRatio">
+              <option value="free" selected>Free</option>
+              <option value="9:16">9:16 — Reels / TikTok</option>
+              <option value="4:5">4:5 — feed</option>
+              <option value="1:1">1:1 — square</option>
+              <option value="4:3">4:3</option>
+              <option value="3:2">3:2</option>
+              <option value="16:9">16:9 — video</option>
+              <option value="21:9">21:9 — wide</option>
+            </select>
+          </div>
+          <p class="hint" id="frameGuideHint" data-frame-guide>
+            Guide only — the render is unchanged.
+          </p>
           </div>
         </section>
 

@@ -369,6 +369,84 @@ const reference = await page.evaluate(async () => {
 await writeFile(`${ARTIFACT_DIR}/viewport.png`, Buffer.from(reference));
 console.log(`\nReference image written to ${ARTIFACT_DIR}/viewport.png`);
 
+// --- frame guide (Phase 8) -----------------------------------------------
+//
+// A passepartout overlay marking where an export will crop. The two things
+// that would make it worse than not having it, and so the two things checked
+// hardest: it must not appear in the exported image, and it must not intercept
+// a single pointer event. A guide that ends up in the render, or that blocks
+// orbiting, is a regression rather than a feature.
+
+console.log('\nFrame guide');
+
+const preGuideShot = await viewportHash();
+const preGuideCam = await page.evaluate(() => window.__viewer.camera.position.toArray());
+
+await page.evaluate(() => {
+  document.getElementById('frameGuideToggle').click();
+  const select = document.getElementById('frameGuideRatio');
+  select.value = '9:16';
+  select.dispatchEvent(new Event('change'));
+});
+await page.waitForTimeout(300);
+
+const guide = await page.evaluate(() => {
+  const root = document.querySelector('.frame-guide');
+  const outline = document.querySelector('.frame-guide-outline').getBoundingClientRect();
+  const viewport = document.getElementById('viewport').getBoundingClientRect();
+  return {
+    visible: !root.hidden,
+    ratio: outline.width / outline.height,
+    contained: outline.width <= viewport.width + 1 && outline.height <= viewport.height + 1,
+    centered: Math.abs((outline.left - viewport.left) - (viewport.right - outline.right)) < 2
+      && Math.abs((outline.top - viewport.top) - (viewport.bottom - outline.bottom)) < 2,
+    pointerEvents: getComputedStyle(root).pointerEvents,
+    sideBar: Math.round(document.querySelector('.frame-guide-left').getBoundingClientRect().width),
+    topBar: Math.round(document.querySelector('.frame-guide-top').getBoundingClientRect().height),
+  };
+});
+
+check('the frame guide shows when enabled', guide.visible);
+check(
+  'the guide matches the requested ratio',
+  Math.abs(guide.ratio - 9 / 16) < 0.01,
+  `${guide.ratio.toFixed(4)} vs ${(9 / 16).toFixed(4)}`,
+);
+check('the guide is contained in the viewport and centred', guide.contained && guide.centered);
+check('the guide never intercepts pointer events', guide.pointerEvents === 'none');
+check(
+  'a portrait ratio dims the sides, not the top',
+  guide.sideBar > 0 && guide.topBar === 0,
+  `left ${guide.sideBar}px, top ${guide.topBar}px`,
+);
+
+// The whole promise of "guide only": the export has to be byte-identical.
+check('the guide does not appear in the exported image', (await viewportHash()) === preGuideShot);
+
+// And the canvas underneath still has to be draggable.
+await page.mouse.move(400, 350);
+await page.mouse.down();
+await page.mouse.move(520, 330, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(400);
+const orbited = await page.evaluate(
+  (before) => window.__viewer.camera.position.toArray().some((n, i) => Math.abs(n - before[i]) > 0.01),
+  preGuideCam,
+);
+check('orbiting still works through the overlay', orbited);
+
+await page.evaluate(() => {
+  const select = document.getElementById('frameGuideRatio');
+  select.value = 'free';
+  select.dispatchEvent(new Event('change'));
+  document.getElementById('frameGuideToggle').click();
+});
+await page.waitForTimeout(200);
+check(
+  'disabling the guide hides it',
+  await page.evaluate(() => document.querySelector('.frame-guide').hidden),
+);
+
 // --- saved views (Phase 8) ------------------------------------------------
 //
 // Five one-click views. They go through frameCamera()'s existing distance,
