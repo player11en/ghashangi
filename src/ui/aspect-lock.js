@@ -69,6 +69,12 @@ export function lockAspect(container, viewer, ratioKey) {
     height: container.style.height,
   };
 
+  // Flagged on the element itself so the frame guide can stand down without
+  // this module needing a reference to it: while a lock is in force the
+  // viewport IS the frame, so a guide drawn on top of it would be a second,
+  // different frame inside the real one.
+  container.dataset.aspectLocked = 'true';
+
   container.style.left = `${Math.round((availableWidth - width) / 2)}px`;
   container.style.top = `${Math.round((availableHeight - height) / 2)}px`;
   container.style.right = 'auto';
@@ -84,6 +90,7 @@ export function lockAspect(container, viewer, ratioKey) {
 /** Restore whatever lockAspect() returned, and resize back immediately. */
 export function unlockAspect(container, viewer, previous) {
   if (!previous) return;
+  delete container.dataset.aspectLocked;
   Object.assign(container.style, previous);
   viewer.resize();
 }

@@ -230,6 +230,63 @@ const rejectedWithoutWaypoints = await page.evaluate(async () => {
 });
 check('recording without enough waypoints is rejected', rejectedWithoutWaypoints);
 
+// --- the frame guide stands down under an aspect lock ---------------------
+//
+// Found by checking rather than reasoning: with the guide set to 1:1 and the
+// camera path to 9:16, a preview drew a square guide box *inside* the portrait
+// crop - two differently-proportioned frames stacked. While a lock is in force
+// the viewport has been resized to the target shape, so it already is the
+// frame and anything drawn over it is a second one.
+
+console.log('\nFrame guide under an aspect lock');
+
+await page.evaluate(() => {
+  document.getElementById('frameGuideToggle').click();
+  const guide = document.getElementById('frameGuideRatio');
+  guide.value = '1:1';
+  guide.dispatchEvent(new Event('change'));
+  const aspect = document.getElementById('cpAspect');
+  aspect.value = '9:16';
+  aspect.dispatchEvent(new Event('change'));
+
+  const cp = window.__cameraPath;
+  cp.clear();
+  cp.addWaypoint();
+  window.__viewer.camera.position.set(6, 4, 9);
+  cp.addWaypoint();
+});
+await page.waitForTimeout(400);
+
+const guideBefore = await page.evaluate(() => !document.querySelector('.frame-guide').hidden);
+check('the guide is showing before a preview', guideBefore);
+
+await page.evaluate(() => document.getElementById('cpPreviewPlay').click());
+await page.waitForTimeout(900);
+const duringPreview = await page.evaluate(() => ({
+  locked: document.getElementById('viewport').dataset.aspectLocked === 'true',
+  guideVisible: !document.querySelector('.frame-guide').hidden,
+}));
+check('previewing locks the viewport to the path aspect', duringPreview.locked);
+check('the guide stands down while the lock is in force', duringPreview.guideVisible === false);
+
+await page.evaluate(() => document.getElementById('cpPreviewPlay').click());
+await page.waitForTimeout(700);
+const afterPreview = await page.evaluate(() => ({
+  locked: document.getElementById('viewport').dataset.aspectLocked === 'true',
+  guideVisible: !document.querySelector('.frame-guide').hidden,
+}));
+check('the lock is released when the preview stops', afterPreview.locked === false);
+check('the guide comes back afterwards', afterPreview.guideVisible);
+
+await page.evaluate(() => {
+  document.getElementById('frameGuideToggle').click();
+  const aspect = document.getElementById('cpAspect');
+  aspect.value = 'free';
+  aspect.dispatchEvent(new Event('change'));
+  window.__cameraPath.clear();
+});
+await page.waitForTimeout(300);
+
 // --- locked-off camera (Phase 8) -----------------------------------------
 //
 // There was no way to record a still camera at all: the turntable rotates the

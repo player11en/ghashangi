@@ -107,7 +107,13 @@ export function createFrameGuide(container) {
 
   function refresh() {
     const b = box();
-    const show = enabled && b !== null;
+    // While an aspect lock is in force (a camera-path preview or a recording)
+    // the viewport has been resized to the target shape, so it *is* the frame.
+    // Drawing the guide on top would put a second, differently-proportioned
+    // frame inside the real one - verified: with the guide at 1:1 and the path
+    // at 9:16, a square box appeared inside the portrait crop.
+    const locked = container.dataset.aspectLocked === 'true';
+    const show = enabled && b !== null && !locked;
     root.hidden = !show;
     if (!show) return;
 
