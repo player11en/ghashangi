@@ -18,64 +18,66 @@ known gap, it says so, and says why it has not been closed yet.
 | **Colourways** | Named material sets, per-model persistence, batch PNG export as a zip, GLB export |
 | **Lighting** | Five-light rig, shadows, AgX/ACES/Neutral tone mapping, HDR environment with rotation and intensity |
 | **Fidelity** | GTAO ambient occlusion, SMAA, depth of field — each lazily loaded, each with a pixel-exact off state |
-| **Style** | 12 reorderable stylization passes: CRT, film, retro palette, ASCII, halftone, bloom, glitch, trails, colour grade, tone, repeat, displace |
+| **Style** | 13 reorderable stylization passes: CRT, film, retro palette, pixelate, ASCII, halftone, bloom, glitch, trails, colour grade, tone, repeat, displace |
 | **Animation** | Clip list, transport, scrub, speed, loop |
 | **Output** | Screenshots to 4x with optional transparency, turntable WebM, camera-path clips with 9:16 / 1:1 aspect lock |
 | **Performance** | On-demand rendering (0 fps at rest), device capability tiers, dense-model triangle budget, ~1.4 MB first load |
 
-218 checks across 8 browser suites. See [test/README.md](test/README.md).
+234 checks across 8 browser suites. See [test/README.md](test/README.md).
 
 ---
 
-## Phase 7 — Control gaps and panel overview
+## Phase 7 — Control gaps and panel overview — **SHIPPED**
 
-Everything here is small, and all of it came out of actually using the app
-rather than reading the code.
+Everything here was small, and all of it came out of actually using the app
+rather than reading the code. Four of the six gaps turned out to be controls
+that already existed in the engine with no way to reach them.
 
-### Confirmed gaps where the backend is already built
+Delivered: bloom threshold + radius, dither strength, light colour (sun and
+both fills), ASCII letter width/height/spacing/contrast/brightness/background,
+standalone pixelate (with pixel aspect and grid lines), stage colour and
+roughness, a global settings reset, five panel tabs replacing the thirteen-
+section scroll and its jump rail, and drag-to-reorder on the Style chain.
 
-- **Bloom threshold and radius have no UI.** `setBloomThreshold()` and
-  `setBloomRadius()` exist in `post.js` and work; neither has a slider. With
-  threshold stuck at its 0.7 default, turning the lights up blooms the whole
-  frame with no way to say "only the genuinely bright parts". The most
-  visible missing control in the app.
-- **No global settings reset.** There is Reset Cam, Reset Material and Reset
-  Orientation, but nothing returning lighting, Style and fidelity to shipped
-  defaults. Recovering from an over-cranked setup means un-toggling by hand
-  or clearing site data.
-- **Light colours are hardcoded.** The two fill lights are authored blue and
-  salmon. No picker for either, or for the sun.
-- **Pixelation is welded to the retro palette.** It is a uniform inside
-  `palette-pass.js`, so pixelating without also quantizing to a fixed
-  palette is impossible. It should switch independently.
-- **ASCII is thin on controls** next to every other pass: cell size,
-  colourise, invert and the ramp, with no luminance brightness/contrast
-  remap and no background colour.
-- **The stage has visibility and nothing else.** Show or hide, no colour, no
-  roughness, no "just a gradient backdrop" mode.
+234 checks across 8 suites, zero failures. Two bugs were found by testing
+rather than by reasoning: the stage appearance defaults did not match
+Stage.glb's authored material, and because settings.js restores a field by
+dispatching a real `input` event — indistinguishable from a user drag — the
+"preserve unless touched" flag it relied on could never work.
 
-### Panel overview
+### Worth keeping from the diagnosis
 
-Thirteen sections in one scrolling column, with a thirteen-button jump rail
-beside it, is past what either pattern carries well — and every item in this
-roadmap adds rows. Moving to a **tab bar** that groups the existing sections,
-keeping the accordion inside each tab:
+Two of these are the interesting ones, because they are the pattern rather
+than the individual bug:
 
-| Tab | Sections |
-|---|---|
-| Model | Load, Model, Orientation, Animation |
-| Look | Materials, Colourways, Lighting, Environment, Stage |
-| Style | Style (effects and chain order) |
-| Output | Capture, Camera Path, Turntable |
-| Info | Stats |
+- **Bloom's threshold and radius had existed since bloom shipped**, wired to
+  nothing. Threshold therefore sat at 0.7 permanently, which is the whole
+  reason "turn the lights up and enable bloom" blew the frame out with no
+  available response except dimming the highlights that should bloom. Same
+  story for dither strength, hardcoded at 0.06 inside the palette shader.
+  Working engine code with no route to it is invisible in a feature list and
+  reads to a user as a missing feature.
+- **ASCII could not express what was asked for.** "Letter width and
+  closeness" was not a missing slider: a single `cellSize` uniform made
+  terminal proportions unreachable, because glyphs are baked into *square*
+  atlas cells and a square screen cell stretches every character. Width and
+  height are independent now, and spacing shrinks the glyph inside its cell
+  rather than shrinking the grid, so tuning the gaps does not move the
+  character layout.
 
-The tab bar replaces the jump rail rather than sitting beside it. This is a
-layout change inside one app — not a mode switch, not a second shell.
+### Left over, and worth naming
 
-### Style chain drag-and-drop
+The tabs fixed the panel, not the Style tab. It still lists 13 effect
+checkboxes and then, directly underneath, the same 13 names again as chain
+rows — every effect, whether or not it is switched on. So the densest tab in
+the app is roughly twice as long as it needs to be, and most of its second
+list is inert. Filtering the chain list to enabled effects (with a hint when
+it is empty) is a small change and the single biggest remaining readability
+win in the panel.
 
-The up/down buttons stay, for keyboard and screen-reader access. Dragging is
-added on top of them.
+Also unfinished from this phase: pixelation was split out of the palette pass
+so it composes freely, and dithering was not. A standalone dither pass is in
+Phase 9.
 
 ---
 
@@ -102,8 +104,6 @@ shape the existing twelve already follow.
 
 - **Voronoi / cellular** — shatter, stained-glass and mosaic looks from one
   cell-hash shader. Genuinely unlike anything currently in the chain.
-- **Standalone pixelate** — lifted out of the palette pass so it composes
-  with everything else.
 - **Kuwahara** — the painterly/oil-paint filter. Distinctive, well
   documented, strong fit for abstract output.
 - **Pixel sort** — rated worth building two planning rounds ago and still not
@@ -114,13 +114,75 @@ shape the existing twelve already follow.
   files means the grade a colourist actually hands over, rather than only the
   brightness/contrast/hue maths the colour-grade pass does today. The closest
   thing on this list to a professional-tool feature.
-- **More depth on what exists** — ASCII luminance remap and background
-  colour, standalone chromatic aberration (reachable only inside CRT right
-  now), standalone dither.
+- **More depth on what exists** — standalone chromatic aberration (reachable
+  only inside CRT right now), and a standalone dither to finish the split that
+  pixelate already got.
 
 ---
 
-## Phase 10 — Environment and staging
+## Phase 10 — Timeline and keyframes
+
+The natural endpoint of the camera path, and the thing that multiplies every
+effect already built: keyframe an effect's *parameters* over time, keyframe
+effects on and off, and eventually edit all of it on one timeline rather than
+through a duration slider.
+
+A hue that cycles across a clip, a CRT that cuts in for eight frames, a
+pixelate that coarsens as the camera pulls out — none of those are new
+shaders. They are the existing uniforms, animated. That is why this sits ahead
+of multi-model composition despite being smaller: it raises the ceiling on
+work already shipped instead of adding a new category of work.
+
+**Most of the substrate exists**, which is the main argument for doing it
+properly rather than bolting an animation onto one effect:
+
+- `camera-path.js` already exposes `preview(t)` over a normalised 0..1 scrub.
+  If keyframes use that same normalised clock, camera moves, parameter
+  animation and clip recording all share one timeline instead of three.
+- `post.js` already routes parameters through generic per-pass setters
+  (`setAsciiParam`, `setPixelateParam`, `setHalftoneParam`, …), so a keyframe
+  track can address a target as `(passKey, uniformName, value)` without a new
+  dispatch layer.
+- `settings.js`'s `FIELDS` is already a registry of all 94 controls and their
+  kinds. A keyframe UI should read that registry rather than maintain a second
+  list of what is animatable, or the two will drift the way every duplicated
+  table in this project has.
+- The recorder already holds the render loop open for the duration of a
+  capture, so frames are continuous while a clip records — which is exactly
+  what interpolation needs and is not true at rest, where the loop idles at
+  zero.
+
+**The one real trap, worth writing down before anyone starts.** Enabling a
+Style effect is asynchronous: `setStyleEnabled()` lazily imports the pass
+module the first time it is switched on. A keyframe that turns an effect on
+mid-playback would therefore trigger a module load in the middle of a
+recording and drop frames. The fix is a pre-roll: instantiate every pass the
+timeline references *before* playback starts, then only flip `pass.enabled`
+during playback, which is synchronous and free. Anything that keyframes
+on/off state has to do this or the recording will stutter exactly where the
+effect appears.
+
+Staging, smallest first, because each step is useful alone:
+
+1. **One parameter, animated.** Keyframe a single numeric uniform (hue is the
+   obvious first: visually obvious, cheap, and loops cleanly) across the
+   existing camera-path duration. Proves the clock and the interpolation.
+2. **Any parameter.** Generalise to any `FIELDS` entry with a numeric or
+   colour kind, addressed through the existing per-pass setters.
+3. **On/off keyframes**, with the pre-roll above.
+4. **A real timeline UI** — tracks, keyframes, drag to move, an editable
+   duration — replacing the duration slider rather than sitting beside it.
+   Camera waypoints become one track among several at this point instead of
+   their own separate feature.
+5. **Easing per keyframe.** Linear reads mechanical on camera moves already;
+   it will read worse on a hue sweep.
+
+Not Blender's dope sheet. Blender edits a scene graph with hundreds of
+animatable channels; this needs a handful of tracks over a clip that is
+usually five to fifteen seconds, and the low-entry promise means the timeline
+has to stay closed and out of the way until someone asks for it.
+
+## Phase 11 — Environment and staging
 
 - **Stage appearance** — colour, roughness, and a solid/gradient backdrop
   mode that needs no model at all.
@@ -132,7 +194,7 @@ shape the existing twelve already follow.
 
 ---
 
-## Phase 11 — Multi-model scene composition
+## Phase 12 — Multi-model scene composition
 
 The largest item here, and the one that changes the app's shape rather than
 adding to it: more than one model in a scene, each with its own transform, so
@@ -157,7 +219,7 @@ is why it sits behind the phases above rather than in front of them.
 
 ---
 
-## Phase 12 — Output and sharing
+## Phase 13 — Output and sharing
 
 - **MP4 export.** WebM does not play on Safari/iOS and does not drop into
   most editors — real friction for a tool whose output is meant to be posted.
@@ -174,10 +236,10 @@ is why it sits behind the phases above rather than in front of them.
 
 ---
 
-## Phase 13 — Inspect and reuse
+## Phase 14 — Inspect and reuse
 
-- **Inspect modes** — wireframe, UV checker, normals, flat shading. Planned
-  in the first rebuild plan and never built.
+- **Inspect modes** — UV checker, normals, flat shading. Wireframe already
+  ships (Model tab); the rest of that original list never got built.
 - **Named looks** — export and import a full rig plus Style chain as one
   small JSON, separate from the per-model colourways that already persist.
 - **Measurement and bounding-box readout.**
@@ -218,6 +280,14 @@ one:
 - **One app, one panel, one engine.** No mode switch, no second shell, no
   separate pro build. Studio work and stylized work share one scene, one
   light rig and one export path.
+- **Opening it has to stay free.** 119 controls now exist, and the defence
+  against that is not restraint in what gets added — it is that every one of
+  them defaults to off or to the shipped value, so dropping a file still gets
+  a framed, lit, good-looking render with zero clicks. Any feature that has to
+  be configured before the app is useful breaks the only real advantage this
+  has over Marmoset or KeyShot. The timeline in Phase 10 is the first item on
+  this list with a serious chance of breaking that rule, which is why it stays
+  collapsed until asked for.
 - **Measure before optimising.** Compressing the demo model started by
   measuring where its 4.4 MB actually was — textures, not geometry — instead
   of reaching for the obvious tool.
