@@ -147,9 +147,17 @@ export function createCameraPath({ viewer, onChange = () => {} }) {
     apply(evaluate(fraction, forDurationSeconds));
   }
 
-  /** Play the path live in the viewport. */
+  /**
+   * Play the path live in the viewport.
+   *
+   * One waypoint is allowed, and is not a degenerate case: it is a locked-off
+   * shot. evaluate() already returns that waypoint's position and target for
+   * any t, so the camera simply holds still while the scene - a model's own
+   * animation clip, or any of the time-varying Style passes - moves under it.
+   * Zero waypoints is the only thing there is nothing to play.
+   */
   function play({ duration = durationSeconds, loop: shouldLoop = false } = {}) {
-    if (waypoints.length < 2 || playing) return;
+    if (waypoints.length < 1 || playing) return;
     durationSeconds = duration;
     looping = shouldLoop;
     playing = true;
@@ -217,8 +225,8 @@ export function createCameraPath({ viewer, onChange = () => {} }) {
  * @returns {Promise<Blob>} a .webm
  */
 export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onProgress, signal }) {
-  if (cameraPath.waypoints.length < 2) {
-    return Promise.reject(new Error('Add at least two waypoints before recording a camera path.'));
+  if (cameraPath.waypoints.length < 1) {
+    return Promise.reject(new Error('Add a waypoint before recording.'));
   }
 
   const { camera, controls } = viewer;
@@ -242,6 +250,44 @@ export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onPro
     },
     onFrame(fraction) {
       cameraPath.driveFrom(fraction, duration);
+    },
+    onProgress,
+    signal,
+  });
+}
+
+/**
+ * Record a clip from wherever the camera is right now, without touching it.
+ *
+ * Distinct from recordCameraPath() with a single waypoint, and both are worth
+ * having: this answers "record what I am looking at", while a one-waypoint
+ * path answers "record from the framing I saved earlier" and survives the
+ * camera being moved in between.
+ *
+ * recordClip()'s `onFrame` already defaults to a no-op, so there is no
+ * per-frame work to do here at all - the whole point is that nothing moves the
+ * camera. What this does add is pausing auto-rotate for the duration, since
+ * "locked off" has to mean locked off; the model spinning would make it a
+ * turntable with extra steps.
+ *
+ * @param {object} options
+ * @param {object} options.viewer
+ * @param {number} options.duration  Seconds.
+ * @param {number} [options.fps=30]
+ * @param {(fraction:number) => void} [options.onProgress]
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<Blob>} a .webm
+ */
+export function recordStatic({ viewer, duration, fps = 30, onProgress, signal }) {
+  return recordClip({
+    viewer,
+    duration,
+    fps,
+    holdKey: 'cameraPath',
+    onSetup() {
+      const wasAutoRotating = viewer.isAutoRotating();
+      viewer.setAutoRotate(false);
+      return () => viewer.setAutoRotate(wasAutoRotating);
     },
     onProgress,
     signal,

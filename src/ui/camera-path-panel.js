@@ -6,7 +6,7 @@
 // driving the camera instead of a skinned mesh, so it reuses that shape
 // rather than inventing a second convention.
 
-import { recordCameraPath } from '../core/camera-path.js';
+import { recordCameraPath, recordStatic } from '../core/camera-path.js';
 import { formatBytes } from './progress.js';
 import { logExport } from '../core/telemetry.js';
 import { withAspectLock, lockAspect, unlockAspect } from './aspect-lock.js';
@@ -38,6 +38,7 @@ export function createCameraPathPanel({
   const scrub = $('cpScrub');
   const previewButton = $('cpPreviewPlay');
   const recordButton = $('cpRecord');
+  const recordStaticButton = $('cpRecordStatic');
 
   function duration() {
     return parseFloat(durationSlider.value);
@@ -48,10 +49,14 @@ export function createCameraPathPanel({
   }
 
   function syncButtons() {
-    const ready = cameraPath.waypoints.length >= 2;
+    // One waypoint is enough: it is a locked-off shot, not an unfinished move
+    // (see camera-path.js's play() for why evaluate() handles it already).
+    const ready = cameraPath.waypoints.length >= 1;
     previewButton.disabled = !ready;
     recordButton.disabled = !ready || !recordingSupported;
     removeButton.disabled = cameraPath.waypoints.length === 0;
+    // Recording the live view needs no waypoints at all.
+    recordStaticButton.disabled = !recordingSupported;
   }
 
   /** Rebuild the waypoint <select> after any add/remove. */
@@ -115,7 +120,16 @@ export function createCameraPathPanel({
     syncPreviewButton();
   });
 
-  recordButton.addEventListener('click', async () => {
+  /**
+   * Everything a recording needs apart from which recorder runs: stop a live
+   * preview first, hold the aspect lock, report progress on the button that
+   * was pressed, download the result, and restore the button either way.
+   *
+   * Shared rather than duplicated because the locked-off and camera-path
+   * recordings differ only in the call in the middle - and a second copy of
+   * the object-URL cleanup is exactly the kind of thing that rots.
+   */
+  async function runRecording({ button, suffix, label: what, record }) {
     if (cameraPath.playing) {
       cameraPath.stop();
       unlockAspect(container, viewer, previewAspectLock);
@@ -123,39 +137,62 @@ export function createCameraPathPanel({
       syncPreviewButton();
     }
 
-    const label = recordButton.textContent;
-    recordButton.disabled = true;
+    const label = button.textContent;
+    button.disabled = true;
 
     try {
-      const blob = await withAspectLock(container, viewer, aspect(), () => recordCameraPath({
-        cameraPath,
-        viewer,
-        duration: duration(),
+      const blob = await withAspectLock(container, viewer, aspect(), () => record({
         onProgress: (fraction) => {
-          recordButton.textContent = `Recording ${Math.round(fraction * 100)}%`;
+          button.textContent = `Recording ${Math.round(fraction * 100)}%`;
         },
       }));
 
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${(getModelName() || 'model').replace(/\.[^.]+$/, '')}-camera-path.webm`;
+      anchor.download = `${(getModelName() || 'model').replace(/\.[^.]+$/, '')}-${suffix}.webm`;
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
 
       logExport('webm');
-      toasts.info('Camera path recorded', formatBytes(blob.size));
+      toasts.info(`${what} recorded`, formatBytes(blob.size));
     } catch (error) {
       if (error.name !== 'AbortError') {
-        console.error('[3DMViewer] camera path recording failed', error);
-        toasts.error('Could not record the camera path', String(error.message));
+        console.error(`[Ghashangi] ${suffix} recording failed`, error);
+        toasts.error(`Could not record the ${what.toLowerCase()}`, String(error.message));
       }
     } finally {
-      recordButton.disabled = false;
-      recordButton.textContent = label;
+      button.disabled = false;
+      button.textContent = label;
       syncButtons();
     }
-  });
+  }
+
+  recordButton.addEventListener('click', () => runRecording({
+    button: recordButton,
+    suffix: 'camera-path',
+    label: 'Camera path',
+    record: ({ onProgress }) => recordCameraPath({
+      cameraPath,
+      viewer,
+      duration: duration(),
+      onProgress,
+    }),
+  }));
+
+  // No waypoints involved: records the view as it currently sits, for a model
+  // playing its own animation or for the time-varying Style passes, both of
+  // which move on their own with the camera still.
+  recordStaticButton.addEventListener('click', () => runRecording({
+    button: recordStaticButton,
+    suffix: 'clip',
+    label: 'Clip',
+    record: ({ onProgress }) => recordStatic({
+      viewer,
+      duration: duration(),
+      onProgress,
+    }),
+  }));
 
   rebuildList();
 

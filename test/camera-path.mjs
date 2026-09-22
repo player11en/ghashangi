@@ -230,6 +230,74 @@ const rejectedWithoutWaypoints = await page.evaluate(async () => {
 });
 check('recording without enough waypoints is rejected', rejectedWithoutWaypoints);
 
+// --- locked-off camera (Phase 8) -----------------------------------------
+//
+// There was no way to record a still camera at all: the turntable rotates the
+// model, a camera path demanded two waypoints, and a screenshot is one frame.
+// So the shot a locked-off camera exists for - a model playing its own clip,
+// or the time-varying Style passes, both of which move on their own - was
+// unreachable. These two checks cover the two entry points, which answer
+// different questions: "record the framing I saved" and "record what I am
+// looking at".
+
+console.log('\nLocked-off camera');
+
+const oneWaypoint = await page.evaluate(() => {
+  const cp = window.__cameraPath;
+  cp.clear();
+  cp.addWaypoint();
+  return {
+    count: cp.waypoints.length,
+    previewEnabled: !document.getElementById('cpPreviewPlay').disabled,
+    recordEnabled: !document.getElementById('cpRecord').disabled,
+  };
+});
+check('one waypoint is enough to preview', oneWaypoint.previewEnabled, `count ${oneWaypoint.count}`);
+check('one waypoint is enough to record', oneWaypoint.recordEnabled);
+
+// A single waypoint must hold the camera still rather than drift, so both ends
+// of the scrub evaluate to the same place.
+const held = await page.evaluate(() => {
+  const cp = window.__cameraPath;
+  cp.preview(0);
+  const a = window.__viewer.camera.position.toArray();
+  cp.preview(1);
+  const b = window.__viewer.camera.position.toArray();
+  return { a, b };
+});
+check(
+  'a one-waypoint path holds the camera still across the whole scrub',
+  held.a.every((v, i) => Math.abs(v - held.b[i]) < 1e-6),
+  `${held.a.map((v) => v.toFixed(2))} -> ${held.b.map((v) => v.toFixed(2))}`,
+);
+
+// The no-waypoint path: records the live view, and must leave the camera and
+// auto-rotate exactly as it found them.
+const staticRecording = await page.evaluate(async () => {
+  const { recordStatic } = await import('/src/core/camera-path.js');
+  const v = window.__viewer;
+  v.setAutoRotate(true);
+  const before = v.camera.position.toArray();
+  const blob = await recordStatic({ viewer: v, duration: 1, fps: 15 });
+  return {
+    type: blob.type,
+    size: blob.size,
+    cameraUnmoved: v.camera.position.toArray().every((n, i) => Math.abs(n - before[i]) < 1e-6),
+    autoRotateRestored: v.isAutoRotating(),
+    heldAfter: v.loop.isHeld('cameraPath'),
+  };
+});
+
+check('recording the current view needs no waypoints', staticRecording.type.startsWith('video/webm'), staticRecording.type);
+check('the camera does not move during a locked-off recording', staticRecording.cameraUnmoved);
+check('auto-rotate is paused for the recording and then restored', staticRecording.autoRotateRestored);
+check('the loop hold is released afterwards', staticRecording.heldAfter === false);
+
+await page.evaluate(() => {
+  window.__viewer.setAutoRotate(false);
+  window.__cameraPath.clear();
+});
+
 // --- report ----------------------------------------------------------------
 
 await browser.close();
