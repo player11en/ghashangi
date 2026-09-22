@@ -26,7 +26,6 @@
   --radius-sm: 5px;
   --gap: 12px;
   --panel-width: 300px;
-  --rail-width: 34px;
 
   --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -87,44 +86,51 @@ body {
   height: 100%;
 }
 
-/* --- jump rail (Track 1.2) ------------------------------------------------ */
-/* Sits immediately left of the panel, same top/height, one button per
-   section — click to open it (if collapsed) and scroll it into view without
-   hunting through 11 sections of scroll. Hidden on narrow viewports; the
-   existing panel-collapse button is the one entry point there instead. */
+/* --- tab bar -------------------------------------------------------------- */
+/* Replaces the old jump rail. Five groups of sections instead of thirteen
+   competing for one scrolling column; the rail had become a second list to
+   learn rather than a shortcut into the first. */
 
-.rail {
-  position: fixed;
-  top: var(--gap);
-  right: calc(var(--gap) * 2 + var(--panel-width));
-  width: var(--rail-width);
-  max-height: calc(100dvh - var(--gap) * 2);
+.tab-bar {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
-  z-index: 10;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
 }
 
-.rail-button {
-  flex: 0 0 auto;
-  padding: 7px 0;
+.panel[data-collapsed='true'] .tab-bar { display: none; }
+
+.tab {
+  flex: 1 1 0;
+  padding: 9px 4px;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: var(--text-dim);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
+  background: none;
+  border: none;
+  /* Overlaps the container's own border, so the active tab reads as joined to
+     the panel below it rather than as a button sitting above a line. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   cursor: pointer;
 }
-.rail-button:hover {
-  color: var(--accent-text);
-  background: var(--accent);
-  border-color: var(--accent);
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* A tab panel is only a grouping container - it must not introduce its own
+   scroll area or spacing, or the sections inside it stop lining up with the
+   ones on every other tab. */
+.tab-panel {
+  display: contents;
 }
 
 /* --- control panel ------------------------------------------------------- */
@@ -460,6 +466,22 @@ input[type='checkbox'] {
 .hint[data-level='warn'] { color: var(--warn); }
 
 /* Sits below the last section: a global action, not part of any one group. */
+.style-order-item[draggable='true'] {
+  cursor: grab;
+}
+
+.style-order-item[data-dragging='true'] {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+/* Where the dragged pass would land. A top border rather than a filled
+   background: it marks the insertion point, which is what the drop actually
+   does, instead of implying the row under the cursor gets replaced. */
+.style-order-item[data-drop-target='true'] {
+  border-top: 2px solid var(--accent);
+}
+
 .panel-reset {
   margin-top: 18px;
 }
@@ -816,10 +838,6 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 3px; }
 
 @media (max-width: 720px) {
   :root { --panel-width: auto; }
-
-  /* One entry point on mobile, not two: the existing panel-collapse button
-     already does the job the rail exists for on desktop. */
-  .rail { display: none; }
 
   .panel {
     top: auto;

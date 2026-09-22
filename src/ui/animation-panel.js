@@ -49,7 +49,7 @@ export function createAnimationPanel({ viewer, onRebuild = () => {} }) {
     // Hidden rather than disabled: a static model has no animation, and an
     // empty transport is noise.
     group.hidden = !anim;
-    // The rail's Animation button should disappear along with the section —
+    // Lets the tab bar drop a tab whose sections have all hidden themselves —
     // called here, unconditionally, since #animationGroup's own `hidden` is
     // now final either way this function proceeds.
     onRebuild();

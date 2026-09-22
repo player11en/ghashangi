@@ -369,6 +369,70 @@ const reference = await page.evaluate(async () => {
 await writeFile(`${ARTIFACT_DIR}/viewport.png`, Buffer.from(reference));
 console.log(`\nReference image written to ${ARTIFACT_DIR}/viewport.png`);
 
+// --- panel tabs -----------------------------------------------------------
+//
+// The panel's 13 sections moved from one scrolling column into 5 tabs. The
+// thing that can silently break is a section ending up on no tab at all -
+// still in the markup, still wired, and unreachable. So this counts sections
+// across every tab rather than trusting the grouping.
+
+console.log('\nPanel tabs');
+
+const tabKeys = await page.$$eval('#tabBar .tab', (els) => els.map((e) => e.dataset.tab));
+check('the tab bar replaced the jump rail', tabKeys.length === 5, tabKeys.join(', '));
+check('the old rail is gone', (await page.$('#rail')) === null);
+
+let reachable = 0;
+let isolated = true;
+for (const key of tabKeys) {
+  await page.click(`#tabBar .tab[data-tab="${key}"]`);
+  await page.waitForTimeout(80);
+  const info = await page.evaluate((k) => {
+    const panelId = document.querySelector(`#tabBar .tab[data-tab="${k}"]`).getAttribute('aria-controls');
+    const panel = document.getElementById(panelId);
+    const others = [...document.querySelectorAll('.tab-panel')].filter((el) => el.id !== panelId);
+    return {
+      shown: !panel.hidden,
+      sections: panel.querySelectorAll('.group').length,
+      othersHidden: others.every((el) => el.hidden),
+    };
+  }, key);
+  reachable += info.sections;
+  if (!info.shown || !info.othersHidden) isolated = false;
+}
+
+check('every section lives on exactly one tab', reachable === 13, `${reachable} sections across ${tabKeys.length} tabs`);
+check('switching tabs shows one panel and hides the rest', isolated);
+
+// A control buried on a non-default tab has to still be operable, not just
+// present - this is the check that would catch a tab panel that renders but
+// leaves its contents display:none or zero-height.
+await page.click('#tabBar .tab[data-tab="style"]');
+await page.waitForTimeout(80);
+const styleReachable = await page.evaluate(() => {
+  const body = document.getElementById('styleBody');
+  if (body.hidden) body.closest('.group').querySelector('.group-title').click();
+  return document.getElementById('bloomToggle').offsetParent !== null;
+});
+check('a control on a non-default tab is actually operable', styleReachable);
+
+// The active tab is persisted like every other panel preference, so returning
+// to the app puts you back where you were working. settings.js debounces its
+// writes by 400ms (a slider drag would otherwise hit localStorage on every
+// pixel), so wait past that before reloading rather than racing it.
+await page.waitForTimeout(700);
+await page.reload({ waitUntil: 'load' });
+await page.waitForFunction(() => window.__viewer?.model != null, null, { timeout: 60_000 });
+await page.waitForTimeout(600);
+const restored = await page.evaluate(
+  () => document.querySelector('#tabBar .tab[aria-selected="true"]')?.dataset.tab,
+);
+check('the active tab survives a reload', restored === 'style', `restored: ${restored}`);
+
+// Put it back so this suite leaves no state behind for the next run.
+await page.evaluate(() => document.querySelector('#tabBar .tab[data-tab="model"]').click());
+await page.waitForTimeout(400);
+
 // --- report --------------------------------------------------------------
 
 await browser.close();

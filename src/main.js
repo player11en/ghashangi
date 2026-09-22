@@ -7,6 +7,7 @@ import { createFileSource } from './sources/file.js';
 import { createMaterialsPanel } from './ui/materials-panel.js';
 import { createAnimationPanel } from './ui/animation-panel.js';
 import { createAccordion } from './ui/accordion.js';
+import { createTabs } from './ui/tabs.js';
 import { createShortcuts } from './ui/shortcuts.js';
 import { createSettings } from './core/settings.js';
 import { createFileSystem, pickPrimary } from './loaders/fs-map.js';
@@ -66,17 +67,24 @@ $('materialRedo').addEventListener('click', () => materialUndo.redo());
 
 // Accordion built before animationPanel: #animationGroup's own `hidden`
 // (whether the model has clips at all) is independent of the accordion's
-// open/closed state, and the rail needs to hide its Animation button when the
-// section hides itself — animation-panel.js calls this at the end of its own
-// rebuild(), since viewer.onAnimationChange() only holds one callback.
-const accordion = createAccordion($('panelBody'), $('rail'));
+// open/closed state, and a tab whose sections have all hidden themselves should
+// drop out of the tab bar — animation-panel.js calls tabs.syncVisibility() at
+// the end of its own rebuild(), since viewer.onAnimationChange() only holds one
+// callback.
+const accordion = createAccordion($('panelBody'));
+const tabs = createTabs($('tabBar'), $('panelBody'));
 
 createShortcuts();
 
-const settings = createSettings({ accordion, orientation: viewer.orientation, post: viewer.post });
+const settings = createSettings({
+  accordion,
+  tabs,
+  orientation: viewer.orientation,
+  post: viewer.post,
+});
 
 // Registers its own viewer callback, so it rebuilds itself on every load.
-const animationPanel = createAnimationPanel({ viewer, onRebuild: accordion.syncRailVisibility });
+const animationPanel = createAnimationPanel({ viewer, onRebuild: tabs.syncVisibility });
 
 // The filesystem backing the current model, kept so its blob URLs can be
 // revoked when the next model replaces it.
@@ -742,6 +750,15 @@ const STYLE_TOGGLE_IDS = {
   glitch: 'glitchToggle',
 };
 
+/** Move `key` to `toIndex` and commit the new chain order. */
+function moveStyle(key, toIndex) {
+  const next = viewer.post.styleOrder.filter((k) => k !== key);
+  next.splice(Math.max(0, Math.min(next.length, toIndex)), 0, key);
+  viewer.post.setStyleOrder(next);
+  renderStyleOrder();
+  settings.save();
+}
+
 function renderStyleOrder() {
   const list = $('styleOrderList');
   const order = viewer.post.styleOrder;
@@ -752,6 +769,37 @@ function renderStyleOrder() {
     item.className = 'style-order-item';
     const enabled = $(STYLE_TOGGLE_IDS[key]).checked;
     item.dataset.enabled = String(enabled);
+
+    // Dragging is an addition, not a replacement: the up/down buttons below
+    // stay because they are the keyboard and screen-reader path, and HTML5
+    // drag-and-drop offers neither. Anyone who can drag gets the faster
+    // route; anyone who cannot loses nothing.
+    item.draggable = true;
+    item.dataset.key = key;
+
+    item.addEventListener('dragstart', (event) => {
+      event.dataTransfer.setData('text/plain', key);
+      event.dataTransfer.effectAllowed = 'move';
+      item.dataset.dragging = 'true';
+    });
+    item.addEventListener('dragend', () => {
+      delete item.dataset.dragging;
+      for (const el of list.children) delete el.dataset.dropTarget;
+    });
+    item.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      item.dataset.dropTarget = 'true';
+    });
+    item.addEventListener('dragleave', () => {
+      delete item.dataset.dropTarget;
+    });
+    item.addEventListener('drop', (event) => {
+      event.preventDefault();
+      const dragged = event.dataTransfer.getData('text/plain');
+      delete item.dataset.dropTarget;
+      if (dragged && dragged !== key) moveStyle(dragged, index);
+    });
 
     const name = document.createElement('span');
     name.className = 'style-order-name';
@@ -764,13 +812,7 @@ function renderStyleOrder() {
     up.textContent = '▲';
     up.disabled = index === 0;
     up.setAttribute('aria-label', `Move ${STYLE_LABELS[key]} earlier in the chain`);
-    up.addEventListener('click', () => {
-      const next = [...order];
-      [next[index - 1], next[index]] = [next[index], next[index - 1]];
-      viewer.post.setStyleOrder(next);
-      renderStyleOrder();
-      settings.save();
-    });
+    up.addEventListener('click', () => moveStyle(key, index - 1));
     item.appendChild(up);
 
     const down = document.createElement('button');
@@ -779,13 +821,7 @@ function renderStyleOrder() {
     down.textContent = '▼';
     down.disabled = index === order.length - 1;
     down.setAttribute('aria-label', `Move ${STYLE_LABELS[key]} later in the chain`);
-    down.addEventListener('click', () => {
-      const next = [...order];
-      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-      viewer.post.setStyleOrder(next);
-      renderStyleOrder();
-      settings.save();
-    });
+    down.addEventListener('click', () => moveStyle(key, index + 1));
     item.appendChild(down);
 
     list.appendChild(item);
@@ -886,6 +922,9 @@ $('paletteName').addEventListener('change', (event) => {
   viewer.post.setPaletteName(event.target.value);
 });
 bindSlider('pixelSize', (v) => viewer.post.setPixelSize(v), (v) => `${v}px`);
+// 0 = hard banding across every gradient, which is a legitimate look; the
+// shipped 0.06 is the value that was previously unreachable.
+bindSlider('ditherStrength', (v) => viewer.post.setDitherStrength(v), (v) => v.toFixed(3));
 
 bindCheckbox('colorGradeToggle', async (on) => {
   markStyleTouched();

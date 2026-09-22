@@ -67,6 +67,7 @@ const FIELDS = [
   { id: 'paletteToggle', kind: 'checkbox' },
   { id: 'paletteName', kind: 'select' },
   { id: 'pixelSize', kind: 'range' },
+  { id: 'ditherStrength', kind: 'range' },
   { id: 'cpDuration', kind: 'range' },
   { id: 'cpAspect', kind: 'select' },
   { id: 'colorGradeToggle', kind: 'checkbox' },
@@ -148,13 +149,15 @@ function writeField({ id, kind }, value) {
  * @param {object} options
  * @param {object} options.accordion   From createAccordion() — for restoring
  *   which sections were left open.
+ * @param {object} options.tabs        From createTabs() — for restoring which
+ *   tab was active. Not a FIELDS entry: it is a key, not a control's value.
  * @param {object} options.orientation From viewer.orientation — for restoring
  *   the up-axis preset only (see the file header for why not the fine angles).
  * @param {object} options.post        From viewer.post — for restoring the
  *   Style effect chain's composite order (Track 5.2). Not a FIELDS entry:
  *   it's a permutation of effect keys, not a single DOM element's value.
  */
-export function createSettings({ accordion, orientation, post }) {
+export function createSettings({ accordion, tabs, orientation, post }) {
   // The shipped defaults, captured from the DOM itself at construction.
   //
   // Timing is the whole trick and it is load-bearing: createSettings() runs
@@ -171,6 +174,7 @@ export function createSettings({ accordion, orientation, post }) {
       fields: Object.fromEntries(FIELDS.map((f) => [f.id, readField(f)])),
       upAxis: orientation.preset,
       styleOrder: post.styleOrder,
+      activeTab: tabs.active(),
       sections: Object.fromEntries(
         accordion.sectionIds().map((id) => [id, accordion.isSectionOpen(id)]),
       ),
@@ -212,6 +216,8 @@ export function createSettings({ accordion, orientation, post }) {
     for (const [id, open] of Object.entries(data.sections ?? {})) {
       accordion.setSectionOpen(id, open);
     }
+
+    if (data.activeTab) tabs.activate(data.activeTab);
   }
 
   /**
@@ -260,6 +266,9 @@ export function createSettings({ accordion, orientation, post }) {
     for (const id of accordion.sectionIds()) {
       const button = $(`${id}Body`)?.closest('.group')?.querySelector('.group-title');
       button?.addEventListener('click', scheduleSave);
+    }
+    for (const tabButton of document.querySelectorAll('#tabBar .tab')) {
+      tabButton.addEventListener('click', scheduleSave);
     }
   }
 

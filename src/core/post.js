@@ -165,6 +165,11 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
   let crtPreset = 'arcade';
   let paletteName = 'gba';
   let pixelSize = 4;
+  // Was baked into palette-pass.js's shader defaults with no way to reach it:
+  // dithering is the thing that stops a fixed palette banding across a
+  // gradient, and how much of it a look wants is a per-look decision, not a
+  // constant.
+  let ditherStrength = 0.06;
   let afterimageTrail = 0.9; // 0..1 UI value; mapped to damp in applyAfterimage()
   let asciiRampName = 'classic';
   let asciiCustomRamp = '';
@@ -264,6 +269,7 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     applyCrtPreset(passes.crt, crtPreset);
     applyPalette(passes.palette, paletteName);
     passes.palette.uniforms.pixelSize.value = pixelSize;
+    passes.palette.uniforms.ditherStrength.value = ditherStrength;
     setAsciiRamp(passes.ascii, asciiRampName, asciiCustomRamp);
     applyFilmPreset(passes.film, filmPreset);
     applyAfterimage();
@@ -523,6 +529,12 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
 
     setPalette(enabled) {
       return setStyleEnabled('palette', enabled);
+    },
+
+    setDitherStrength(value) {
+      ditherStrength = value;
+      if (passes.palette) passes.palette.uniforms.ditherStrength.value = value;
+      invalidate(2);
     },
 
     setPaletteName(name) {

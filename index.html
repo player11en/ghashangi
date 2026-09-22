@@ -37,21 +37,6 @@
 
   <div id="toasts" class="toasts" role="log" aria-live="polite" aria-relevant="additions"></div>
 
-  <nav id="rail" class="rail" aria-label="Jump to panel section">
-      <button type="button" class="rail-button" data-jump="load" title="Load" aria-label="Jump to Load">LD</button>
-      <button type="button" class="rail-button" data-jump="model" title="Model" aria-label="Jump to Model">MO</button>
-      <button type="button" class="rail-button" data-jump="orientation" title="Orientation" aria-label="Jump to Orientation">OR</button>
-      <button type="button" class="rail-button" data-jump="animation" title="Animation" aria-label="Jump to Animation">AN</button>
-      <button type="button" class="rail-button" data-jump="materials" title="Materials" aria-label="Jump to Materials">MA</button>
-      <button type="button" class="rail-button" data-jump="colourways" title="Colourways" aria-label="Jump to Colourways">CO</button>
-      <button type="button" class="rail-button" data-jump="lighting" title="Lighting" aria-label="Jump to Lighting">LI</button>
-      <button type="button" class="rail-button" data-jump="environment" title="Environment" aria-label="Jump to Environment">EN</button>
-      <button type="button" class="rail-button" data-jump="style" title="Style" aria-label="Jump to Style">SY</button>
-      <button type="button" class="rail-button" data-jump="capture" title="Capture" aria-label="Jump to Capture">CA</button>
-      <button type="button" class="rail-button" data-jump="cameraPath" title="Camera Path" aria-label="Jump to Camera Path">CP</button>
-      <button type="button" class="rail-button" data-jump="turntable" title="Turntable" aria-label="Jump to Turntable">TT</button>
-      <button type="button" class="rail-button" data-jump="stats" title="Stats" aria-label="Jump to Stats">ST</button>
-    </nav>
 
   <aside id="panel" class="panel" aria-label="Viewer controls">
     <header class="panel-head">
@@ -60,830 +45,857 @@
               aria-controls="panelBody" title="Collapse panel">−</button>
     </header>
 
+    <!-- Replaces the old 13-button jump rail. Thirteen sections in one scroll
+         was past what an accordion carries: every section competed with every
+         other for the same column, and finding one meant remembering roughly
+         how far down it lived. -->
+    <nav class="tab-bar" id="tabBar" role="tablist" aria-label="Control groups">
+      <button type="button" class="tab" id="tabBtnModel" data-tab="model" role="tab" aria-selected="true" aria-controls="tabModel">Model</button>
+      <button type="button" class="tab" id="tabBtnLook" data-tab="look" role="tab" aria-selected="false" aria-controls="tabLook">Look</button>
+      <button type="button" class="tab" id="tabBtnStyle" data-tab="style" role="tab" aria-selected="false" aria-controls="tabStyle">Style</button>
+      <button type="button" class="tab" id="tabBtnOutput" data-tab="output" role="tab" aria-selected="false" aria-controls="tabOutput">Output</button>
+      <button type="button" class="tab" id="tabBtnInfo" data-tab="info" role="tab" aria-selected="false" aria-controls="tabInfo">Info</button>
+    </nav>
+
     <div class="panel-body" id="panelBody">
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="loadBody">Load</button></h2>
-        <div class="group-body" id="loadBody">
-        <button type="button" id="openFile" class="button">Choose file…</button>
-        <p class="hint">…or drop a file anywhere on the page.</p>
-        <input type="file" id="fileInput" class="visually-hidden"
-               accept=".glb,.gltf,.fbx,.obj,.mtl,.stl,.usdz,.usda,.usdc,.usd,.bin,image/*" multiple>
+      <div class="tab-panel" id="tabModel" role="tabpanel" aria-labelledby="tabBtnModel">
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="loadBody">Load</button></h2>
+          <div class="group-body" id="loadBody">
+          <button type="button" id="openFile" class="button">Choose file…</button>
+          <p class="hint">…or drop a file anywhere on the page.</p>
+          <input type="file" id="fileInput" class="visually-hidden"
+                 accept=".glb,.gltf,.fbx,.obj,.mtl,.stl,.usdz,.usda,.usdc,.usd,.bin,image/*" multiple>
 
-        <form id="urlForm" class="url-form">
-          <label for="urlInput" class="url-label">From a link</label>
-          <div class="url-field">
-            <input type="url" id="urlInput" placeholder="Google Drive share link or direct URL"
-                   autocomplete="off" spellcheck="false">
-            <button type="submit" id="urlSubmit" class="button">Load</button>
+          <form id="urlForm" class="url-form">
+            <label for="urlInput" class="url-label">From a link</label>
+            <div class="url-field">
+              <input type="url" id="urlInput" placeholder="Google Drive share link or direct URL"
+                     autocomplete="off" spellcheck="false">
+              <button type="submit" id="urlSubmit" class="button">Load</button>
+            </div>
+            <p class="hint" id="urlHint">
+              Google Drive, Dropbox, GitHub or any direct link.
+            </p>
+          </form>
+
+          <button type="button" id="loadDemo" class="button button-quiet">Load demo model</button>
           </div>
-          <p class="hint" id="urlHint">
-            Google Drive, Dropbox, GitHub or any direct link.
+        </section>
+
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="modelBody">Model</button></h2>
+          <div class="group-body" id="modelBody">
+          <div class="row">
+            <label for="scaleSlider">Scale</label>
+            <input type="range" id="scaleSlider" min="0.1" max="3" step="0.05" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="scaleOut" value="1.00×" aria-label="Scale value">
+          </div>
+          <div class="row">
+            <label for="heightSlider">Height</label>
+            <input type="range" id="heightSlider" min="-15" max="15" step="0.1" value="0">
+            <input type="text" inputmode="decimal" class="value-input" id="heightOut" value="0.0" aria-label="Height value">
+          </div>
+          <div class="row row-buttons">
+            <button type="button" id="frameButton" class="button button-quiet" title="Shortcut: F">Frame</button>
+            <button type="button" id="resetButton" class="button button-quiet" title="Shortcut: R">Reset cam</button>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="autoRotate">
+            <label for="autoRotate">Auto-rotate</label>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="stageToggle" checked>
+            <label for="stageToggle">Show stage</label>
+          </div>
+          <div class="row" data-stage>
+            <label for="stageColor">Stage color</label>
+            <input type="color" id="stageColor" value="#e7e7e7">
+          </div>
+          <div class="row" data-stage>
+            <label for="stageRoughness">Stage roughness</label>
+            <input type="range" id="stageRoughness" min="0" max="1" step="0.05" value="0.5">
+            <input type="text" inputmode="decimal" class="value-input" id="stageRoughnessOut" value="0.50" aria-label="Stage roughness value">
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="wireframe">
+            <label for="wireframe" title="Shortcut: W">Wireframe</label>
+          </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="orientationBody">Orientation</button></h2>
+          <div class="group-body" id="orientationBody" hidden>
+          <!-- Presets first: Z-up is what Blender, 3ds Max, most CAD kernels and
+               most STLs export, so one click fixes the usual "it loaded on its
+               side" case without anyone hunting for 90 degrees on a slider. -->
+          <div class="row">
+            <label id="upAxisLabel">Up axis</label>
+            <div class="segmented" role="group" aria-labelledby="upAxisLabel">
+              <button type="button" class="seg" data-up="y" aria-pressed="true">Y</button>
+              <button type="button" class="seg" data-up="z" aria-pressed="false">Z</button>
+              <button type="button" class="seg" data-up="x" aria-pressed="false">X</button>
+            </div>
+          </div>
+
+          <div class="row row-axis">
+            <label for="rotX">Rotate X</label>
+            <button type="button" class="nudge" data-axis="x" data-delta="-90" aria-label="Rotate X minus 90 degrees">−90</button>
+            <input type="range" id="rotX" min="-180" max="180" step="1" value="0">
+            <button type="button" class="nudge" data-axis="x" data-delta="90" aria-label="Rotate X plus 90 degrees">+90</button>
+            <input type="text" inputmode="decimal" class="value-input" id="rotXOut" value="0°" aria-label="Rotate X value">
+          </div>
+          <div class="row row-axis">
+            <label for="rotY">Rotate Y</label>
+            <button type="button" class="nudge" data-axis="y" data-delta="-90" aria-label="Rotate Y minus 90 degrees">−90</button>
+            <input type="range" id="rotY" min="-180" max="180" step="1" value="0">
+            <button type="button" class="nudge" data-axis="y" data-delta="90" aria-label="Rotate Y plus 90 degrees">+90</button>
+            <input type="text" inputmode="decimal" class="value-input" id="rotYOut" value="0°" aria-label="Rotate Y value">
+          </div>
+          <div class="row row-axis">
+            <label for="rotZ">Rotate Z</label>
+            <button type="button" class="nudge" data-axis="z" data-delta="-90" aria-label="Rotate Z minus 90 degrees">−90</button>
+            <input type="range" id="rotZ" min="-180" max="180" step="1" value="0">
+            <button type="button" class="nudge" data-axis="z" data-delta="90" aria-label="Rotate Z plus 90 degrees">+90</button>
+            <input type="text" inputmode="decimal" class="value-input" id="rotZOut" value="0°" aria-label="Rotate Z value">
+          </div>
+
+          <button type="button" id="resetOrientation" class="button button-quiet">Reset orientation</button>
+          </div>
+        </section>
+
+        <section class="group" id="animationGroup" hidden>
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="animationBody">Animation <span class="count" id="clipCount"></span></button></h2>
+          <div class="group-body" id="animationBody" hidden>
+          <div class="row">
+            <label for="clipSelect">Clip</label>
+            <select id="clipSelect"></select>
+          </div>
+          <div class="row row-transport">
+            <button type="button" id="playPause" class="button" aria-label="Play" title="Shortcut: Space">▶ Play</button>
+            <output for="timeline" id="timeOut">0.00 / 0.00s</output>
+          </div>
+          <input type="range" id="timeline" class="timeline" min="0" max="1" step="0.001" value="0"
+                 aria-label="Playhead">
+          <div class="row">
+            <label for="animSpeed">Speed</label>
+            <input type="range" id="animSpeed" min="0" max="3" step="0.05" value="1">
+            <output for="animSpeed" id="animSpeedOut">1.00×</output>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="animLoop" checked>
+            <label for="animLoop">Loop</label>
+          </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-panel" id="tabLook" role="tabpanel" aria-labelledby="tabBtnLook" hidden>
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="materialsBody">Materials <span class="count" id="materialCount"></span></button></h2>
+          <div class="group-body" id="materialsBody">
+
+          <ul class="material-list" id="materialList" role="listbox" aria-label="Materials"></ul>
+
+          <div id="materialControls" hidden>
+            <div class="row">
+              <label for="matColor">Base colour</label>
+              <input type="color" id="matColor" value="#ffffff">
+              <input type="text" inputmode="decimal" class="value-input" id="matColorOut" value="#ffffff" aria-label="Base colour hex value">
+            </div>
+            <!-- Colour multiplies the base texture rather than replacing it, so
+                 this dial slides from the authored look to a full tint without
+                 destroying the map's shading and detail. -->
+            <div class="row">
+              <label for="matBlend">Blend</label>
+              <input type="range" id="matBlend" min="0" max="1" step="0.01" value="1">
+              <input type="text" inputmode="decimal" class="value-input" id="matBlendOut" value="100%" aria-label="Blend value">
+            </div>
+            <div class="row" data-channel="metalness">
+              <label for="matMetalness">Metalness</label>
+              <input type="range" id="matMetalness" min="0" max="1" step="0.01" value="0">
+              <input type="text" inputmode="decimal" class="value-input" id="matMetalnessOut" value="0.00" aria-label="Metalness value">
+            </div>
+            <div class="row" data-channel="roughness">
+              <label for="matRoughness">Roughness</label>
+              <input type="range" id="matRoughness" min="0" max="1" step="0.01" value="1">
+              <input type="text" inputmode="decimal" class="value-input" id="matRoughnessOut" value="1.00" aria-label="Roughness value">
+            </div>
+            <div class="row" data-channel="emissive">
+              <label for="matEmissive">Emissive</label>
+              <input type="color" id="matEmissive" value="#000000">
+              <input type="text" inputmode="decimal" class="value-input" id="matEmissiveOut" value="#000000" aria-label="Emissive colour hex value">
+            </div>
+            <div class="row" data-channel="emissiveIntensity">
+              <label for="matEmissiveIntensity">Glow</label>
+              <input type="range" id="matEmissiveIntensity" min="0" max="5" step="0.05" value="1">
+              <input type="text" inputmode="decimal" class="value-input" id="matEmissiveIntensityOut" value="1.00" aria-label="Glow value">
+            </div>
+            <div class="row" data-channel="opacity">
+              <label for="matOpacity">Opacity</label>
+              <input type="range" id="matOpacity" min="0" max="1" step="0.01" value="1">
+              <input type="text" inputmode="decimal" class="value-input" id="matOpacityOut" value="1.00" aria-label="Opacity value">
+            </div>
+
+            <div class="row row-buttons">
+              <button type="button" id="materialUndo" class="button button-quiet" disabled title="Shortcut: Ctrl+Z">Undo</button>
+              <button type="button" id="materialRedo" class="button button-quiet" disabled title="Shortcut: Ctrl+Shift+Z">Redo</button>
+            </div>
+            <div class="row row-buttons">
+              <button type="button" id="resetMaterial" class="button button-quiet">Reset</button>
+              <button type="button" id="resetAllMaterials" class="button button-quiet">Reset all</button>
+            </div>
+          </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="colourwaysBody">Colourways</button></h2>
+          <div class="group-body" id="colourwaysBody">
+          <ul class="colorway-list" id="colorwayList"></ul>
+          <p class="hint" id="colorwayHint">Recolour the materials above, then save the result as a colourway.</p>
+
+          <form id="colorwayForm" class="url-form">
+            <div class="url-field">
+              <input type="text" id="colorwayName" placeholder="Name, e.g. Red" autocomplete="off" maxlength="40">
+              <button type="submit" class="button">Save</button>
+            </div>
+          </form>
+
+          <div class="row">
+            <label for="exportScope">Export</label>
+            <select id="exportScope">
+              <option value="all" selected>All colourways</option>
+              <option value="current">Current view only</option>
+            </select>
+          </div>
+          <button type="button" id="exportPngs" class="button">Export PNGs</button>
+          <button type="button" id="exportGlb" class="button button-quiet">Export GLB</button>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="lightingBody">Lighting</button></h2>
+          <div class="group-body" id="lightingBody" hidden>
+          <div class="row">
+            <label for="ambientSlider">Ambient</label>
+            <input type="range" id="ambientSlider" min="0" max="3" step="0.05" value="0.3">
+            <input type="text" inputmode="decimal" class="value-input" id="ambientOut" value="0.30" aria-label="Ambient light value">
+          </div>
+          <div class="row">
+            <label for="sunSlider">Sun</label>
+            <input type="range" id="sunSlider" min="0" max="5" step="0.05" value="1.8">
+            <input type="text" inputmode="decimal" class="value-input" id="sunOut" value="1.80" aria-label="Sun light value">
+          </div>
+          <div class="row">
+            <label for="sunColor">Sun color</label>
+            <input type="color" id="sunColor" value="#ffffff">
+          </div>
+          <div class="row">
+            <label for="leftSlider">Left fill</label>
+            <input type="range" id="leftSlider" min="0" max="30" step="0.1" value="4.5">
+            <input type="text" inputmode="decimal" class="value-input" id="leftOut" value="4.5" aria-label="Left fill light value">
+          </div>
+          <div class="row">
+            <label for="leftColor">Left fill color</label>
+            <input type="color" id="leftColor" value="#b2b2ff">
+          </div>
+          <div class="row">
+            <label for="rightSlider">Right fill</label>
+            <input type="range" id="rightSlider" min="0" max="30" step="0.1" value="2.1">
+            <input type="text" inputmode="decimal" class="value-input" id="rightOut" value="2.1" aria-label="Right fill light value">
+          </div>
+          <div class="row">
+            <label for="rightColor">Right fill color</label>
+            <input type="color" id="rightColor" value="#ff9898">
+          </div>
+          <div class="row">
+            <label for="angleSlider">Sun angle</label>
+            <input type="range" id="angleSlider" min="-90" max="270" step="1" value="53">
+            <input type="text" inputmode="decimal" class="value-input" id="angleOut" value="53°" aria-label="Sun angle value">
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="shadowToggle" checked>
+            <label for="shadowToggle">Shadows</label>
+          </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="environmentBody">Environment</button></h2>
+          <div class="group-body" id="environmentBody" hidden>
+          <div class="row">
+            <label for="exposureSlider">Exposure</label>
+            <input type="range" id="exposureSlider" min="0" max="3" step="0.05" value="0.6">
+            <input type="text" inputmode="decimal" class="value-input" id="exposureOut" value="0.60" aria-label="Exposure value">
+          </div>
+          <div class="row">
+            <label for="envIntensity">Env intensity</label>
+            <input type="range" id="envIntensity" min="0" max="3" step="0.05" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="envIntensityOut" value="1.00" aria-label="Environment intensity value">
+          </div>
+          <div class="row">
+            <label for="envRotation">Env rotation</label>
+            <input type="range" id="envRotation" min="0" max="360" step="1" value="0">
+            <input type="text" inputmode="decimal" class="value-input" id="envRotationOut" value="0°" aria-label="Environment rotation value">
+          </div>
+          <div class="row">
+            <label for="toneMapping">Tone mapping</label>
+            <select id="toneMapping">
+              <option value="agx" selected>AgX</option>
+              <option value="neutral">Neutral</option>
+              <option value="aces">ACES Filmic</option>
+              <option value="reinhard">Reinhard</option>
+              <option value="cineon">Cineon</option>
+              <option value="linear">Linear</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="qualityTier">Quality</label>
+            <select id="qualityTier">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="bgToggle" checked>
+            <label for="bgToggle">Show background</label>
+          </div>
+
+          <!-- Contact darkening in seams and crevices is what makes a product
+               read as sitting on the backdrop rather than pasted onto it. It is
+               the main thing separating this from a real-time studio renderer.
+               Off by default: it costs a full extra pass per frame. -->
+          <div class="row row-check">
+            <input type="checkbox" id="aoToggle">
+            <label for="aoToggle">Ambient occlusion</label>
+          </div>
+          <div class="row" data-ao>
+            <label for="aoIntensity">AO strength</label>
+            <input type="range" id="aoIntensity" min="0" max="2" step="0.05" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="aoIntensityOut" value="1.00" aria-label="AO strength value">
+          </div>
+          <div class="row" data-ao>
+            <label for="aoRadius">AO radius</label>
+            <input type="range" id="aoRadius" min="0.02" max="1" step="0.01" value="0.25">
+            <input type="text" inputmode="decimal" class="value-input" id="aoRadiusOut" value="0.25" aria-label="AO radius value">
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="aaToggle">
+            <label for="aaToggle">Antialiasing (SMAA)</label>
+          </div>
+
+          <!-- Depth of field sits with AO/AA rather than in Style: it is a
+               lens property of the real 3D scene, and it reads scene depth,
+               which only exists ahead of any stylization pass. -->
+          <div class="row row-check">
+            <input type="checkbox" id="dofToggle">
+            <label for="dofToggle">Depth of field</label>
+          </div>
+          <div class="row" data-dof>
+            <label for="dofFocus">Focus distance</label>
+            <input type="range" id="dofFocus" min="0.5" max="60" step="0.5" value="18">
+            <input type="text" inputmode="decimal" class="value-input" id="dofFocusOut" value="18.0" aria-label="Focus distance value">
+          </div>
+          <div class="row" data-dof>
+            <label for="dofAperture">Aperture</label>
+            <input type="range" id="dofAperture" min="0" max="0.02" step="0.0005" value="0.002">
+            <output for="dofAperture" id="dofApertureOut">0.0020</output>
+          </div>
+          <div class="row" data-dof>
+            <label for="dofMaxBlur">Max blur</label>
+            <input type="range" id="dofMaxBlur" min="0" max="0.05" step="0.001" value="0.01">
+            <output for="dofMaxBlur" id="dofMaxBlurOut">0.010</output>
+          </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-panel" id="tabStyle" role="tabpanel" aria-labelledby="tabBtnStyle" hidden>
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="styleBody">Style</button></h2>
+          <div class="group-body" id="styleBody" hidden>
+          <div class="row" id="styleFpsRow" hidden>
+            <label>Style FPS</label>
+            <output id="styleFpsOut">—</output>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="crtToggle">
+            <label for="crtToggle">CRT</label>
+          </div>
+          <div class="row" data-crt>
+            <label for="crtPreset">CRT look</label>
+            <select id="crtPreset">
+              <option value="arcade" selected>Arcade</option>
+              <option value="vhs">VHS</option>
+              <option value="oldtv">Old TV</option>
+            </select>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="bloomToggle">
+            <label for="bloomToggle">Bloom</label>
+          </div>
+          <div class="row" data-bloom>
+            <label for="bloomStrength">Bloom strength</label>
+            <input type="range" id="bloomStrength" min="0" max="2" step="0.05" value="0.6">
+            <input type="text" inputmode="decimal" class="value-input" id="bloomStrengthOut" value="0.60" aria-label="Bloom strength value">
+          </div>
+          <!-- Threshold is the control that decides WHAT glows, and without it
+               bloom reads as "the whole image is blown out": every pixel above
+               0.7 luminance blooms and the only available response is dimming
+               strength, which also dims the highlights that should bloom. -->
+          <div class="row" data-bloom>
+            <label for="bloomThreshold">Bloom threshold</label>
+            <input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.7">
+            <input type="text" inputmode="decimal" class="value-input" id="bloomThresholdOut" value="0.70" aria-label="Bloom threshold value">
+          </div>
+          <div class="row" data-bloom>
+            <label for="bloomRadius">Bloom radius</label>
+            <input type="range" id="bloomRadius" min="0" max="1" step="0.05" value="0.4">
+            <input type="text" inputmode="decimal" class="value-input" id="bloomRadiusOut" value="0.40" aria-label="Bloom radius value">
+          </div>
+          <p class="hint" data-bloom>
+            Raise the threshold so only genuinely bright areas glow; lower it to
+            bloom the whole frame.
           </p>
-        </form>
-
-        <button type="button" id="loadDemo" class="button button-quiet">Load demo model</button>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="modelBody">Model</button></h2>
-        <div class="group-body" id="modelBody">
-        <div class="row">
-          <label for="scaleSlider">Scale</label>
-          <input type="range" id="scaleSlider" min="0.1" max="3" step="0.05" value="1">
-          <input type="text" inputmode="decimal" class="value-input" id="scaleOut" value="1.00×" aria-label="Scale value">
-        </div>
-        <div class="row">
-          <label for="heightSlider">Height</label>
-          <input type="range" id="heightSlider" min="-15" max="15" step="0.1" value="0">
-          <input type="text" inputmode="decimal" class="value-input" id="heightOut" value="0.0" aria-label="Height value">
-        </div>
-        <div class="row row-buttons">
-          <button type="button" id="frameButton" class="button button-quiet" title="Shortcut: F">Frame</button>
-          <button type="button" id="resetButton" class="button button-quiet" title="Shortcut: R">Reset cam</button>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="autoRotate">
-          <label for="autoRotate">Auto-rotate</label>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="stageToggle" checked>
-          <label for="stageToggle">Show stage</label>
-        </div>
-        <div class="row" data-stage>
-          <label for="stageColor">Stage color</label>
-          <input type="color" id="stageColor" value="#e7e7e7">
-        </div>
-        <div class="row" data-stage>
-          <label for="stageRoughness">Stage roughness</label>
-          <input type="range" id="stageRoughness" min="0" max="1" step="0.05" value="0.5">
-          <input type="text" inputmode="decimal" class="value-input" id="stageRoughnessOut" value="0.50" aria-label="Stage roughness value">
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="wireframe">
-          <label for="wireframe" title="Shortcut: W">Wireframe</label>
-        </div>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="orientationBody">Orientation</button></h2>
-        <div class="group-body" id="orientationBody" hidden>
-        <!-- Presets first: Z-up is what Blender, 3ds Max, most CAD kernels and
-             most STLs export, so one click fixes the usual "it loaded on its
-             side" case without anyone hunting for 90 degrees on a slider. -->
-        <div class="row">
-          <label id="upAxisLabel">Up axis</label>
-          <div class="segmented" role="group" aria-labelledby="upAxisLabel">
-            <button type="button" class="seg" data-up="y" aria-pressed="true">Y</button>
-            <button type="button" class="seg" data-up="z" aria-pressed="false">Z</button>
-            <button type="button" class="seg" data-up="x" aria-pressed="false">X</button>
+          <div class="row row-check">
+            <input type="checkbox" id="glitchToggle">
+            <label for="glitchToggle">Glitch</label>
           </div>
-        </div>
-
-        <div class="row row-axis">
-          <label for="rotX">Rotate X</label>
-          <button type="button" class="nudge" data-axis="x" data-delta="-90" aria-label="Rotate X minus 90 degrees">−90</button>
-          <input type="range" id="rotX" min="-180" max="180" step="1" value="0">
-          <button type="button" class="nudge" data-axis="x" data-delta="90" aria-label="Rotate X plus 90 degrees">+90</button>
-          <input type="text" inputmode="decimal" class="value-input" id="rotXOut" value="0°" aria-label="Rotate X value">
-        </div>
-        <div class="row row-axis">
-          <label for="rotY">Rotate Y</label>
-          <button type="button" class="nudge" data-axis="y" data-delta="-90" aria-label="Rotate Y minus 90 degrees">−90</button>
-          <input type="range" id="rotY" min="-180" max="180" step="1" value="0">
-          <button type="button" class="nudge" data-axis="y" data-delta="90" aria-label="Rotate Y plus 90 degrees">+90</button>
-          <input type="text" inputmode="decimal" class="value-input" id="rotYOut" value="0°" aria-label="Rotate Y value">
-        </div>
-        <div class="row row-axis">
-          <label for="rotZ">Rotate Z</label>
-          <button type="button" class="nudge" data-axis="z" data-delta="-90" aria-label="Rotate Z minus 90 degrees">−90</button>
-          <input type="range" id="rotZ" min="-180" max="180" step="1" value="0">
-          <button type="button" class="nudge" data-axis="z" data-delta="90" aria-label="Rotate Z plus 90 degrees">+90</button>
-          <input type="text" inputmode="decimal" class="value-input" id="rotZOut" value="0°" aria-label="Rotate Z value">
-        </div>
-
-        <button type="button" id="resetOrientation" class="button button-quiet">Reset orientation</button>
-        </div>
-      </section>
-
-      <section class="group" id="animationGroup" hidden>
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="animationBody">Animation <span class="count" id="clipCount"></span></button></h2>
-        <div class="group-body" id="animationBody" hidden>
-        <div class="row">
-          <label for="clipSelect">Clip</label>
-          <select id="clipSelect"></select>
-        </div>
-        <div class="row row-transport">
-          <button type="button" id="playPause" class="button" aria-label="Play" title="Shortcut: Space">▶ Play</button>
-          <output for="timeline" id="timeOut">0.00 / 0.00s</output>
-        </div>
-        <input type="range" id="timeline" class="timeline" min="0" max="1" step="0.001" value="0"
-               aria-label="Playhead">
-        <div class="row">
-          <label for="animSpeed">Speed</label>
-          <input type="range" id="animSpeed" min="0" max="3" step="0.05" value="1">
-          <output for="animSpeed" id="animSpeedOut">1.00×</output>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="animLoop" checked>
-          <label for="animLoop">Loop</label>
-        </div>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="materialsBody">Materials <span class="count" id="materialCount"></span></button></h2>
-        <div class="group-body" id="materialsBody">
-
-        <ul class="material-list" id="materialList" role="listbox" aria-label="Materials"></ul>
-
-        <div id="materialControls" hidden>
-          <div class="row">
-            <label for="matColor">Base colour</label>
-            <input type="color" id="matColor" value="#ffffff">
-            <input type="text" inputmode="decimal" class="value-input" id="matColorOut" value="#ffffff" aria-label="Base colour hex value">
+          <div class="row row-check" data-glitch>
+            <input type="checkbox" id="glitchWild">
+            <label for="glitchWild">Wild mode</label>
           </div>
-          <!-- Colour multiplies the base texture rather than replacing it, so
-               this dial slides from the authored look to a full tint without
-               destroying the map's shading and detail. -->
-          <div class="row">
-            <label for="matBlend">Blend</label>
-            <input type="range" id="matBlend" min="0" max="1" step="0.01" value="1">
-            <input type="text" inputmode="decimal" class="value-input" id="matBlendOut" value="100%" aria-label="Blend value">
+          <div class="row row-check">
+            <input type="checkbox" id="pixelateToggle">
+            <label for="pixelateToggle">Pixelate</label>
           </div>
-          <div class="row" data-channel="metalness">
-            <label for="matMetalness">Metalness</label>
-            <input type="range" id="matMetalness" min="0" max="1" step="0.01" value="0">
-            <input type="text" inputmode="decimal" class="value-input" id="matMetalnessOut" value="0.00" aria-label="Metalness value">
+          <div class="row" data-pixelate>
+            <label for="pixelateSize">Pixel size</label>
+            <input type="range" id="pixelateSize" min="2" max="48" step="1" value="6">
+            <input type="text" inputmode="numeric" class="value-input" id="pixelateSizeOut" value="6px" aria-label="Pixel size">
           </div>
-          <div class="row" data-channel="roughness">
-            <label for="matRoughness">Roughness</label>
-            <input type="range" id="matRoughness" min="0" max="1" step="0.01" value="1">
-            <input type="text" inputmode="decimal" class="value-input" id="matRoughnessOut" value="1.00" aria-label="Roughness value">
+          <div class="row" data-pixelate>
+            <label for="pixelateAspect">Pixel aspect</label>
+            <input type="range" id="pixelateAspect" min="0.25" max="4" step="0.05" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="pixelateAspectOut" value="1.00" aria-label="Pixel aspect ratio">
           </div>
-          <div class="row" data-channel="emissive">
-            <label for="matEmissive">Emissive</label>
-            <input type="color" id="matEmissive" value="#000000">
-            <input type="text" inputmode="decimal" class="value-input" id="matEmissiveOut" value="#000000" aria-label="Emissive colour hex value">
+          <div class="row" data-pixelate>
+            <label for="pixelateGrid">Grid lines</label>
+            <input type="range" id="pixelateGrid" min="0" max="1" step="0.05" value="0">
+            <input type="text" inputmode="decimal" class="value-input" id="pixelateGridOut" value="0.00" aria-label="Pixel grid strength">
           </div>
-          <div class="row" data-channel="emissiveIntensity">
-            <label for="matEmissiveIntensity">Glow</label>
-            <input type="range" id="matEmissiveIntensity" min="0" max="5" step="0.05" value="1">
-            <input type="text" inputmode="decimal" class="value-input" id="matEmissiveIntensityOut" value="1.00" aria-label="Glow value">
+          <div class="row row-check">
+            <input type="checkbox" id="paletteToggle">
+            <label for="paletteToggle">Retro palette</label>
           </div>
-          <div class="row" data-channel="opacity">
-            <label for="matOpacity">Opacity</label>
-            <input type="range" id="matOpacity" min="0" max="1" step="0.01" value="1">
-            <input type="text" inputmode="decimal" class="value-input" id="matOpacityOut" value="1.00" aria-label="Opacity value">
+          <div class="row" data-palette>
+            <label for="paletteName">Palette</label>
+            <select id="paletteName">
+              <option value="gba" selected>Game Boy</option>
+              <option value="genesis">Genesis</option>
+              <option value="atari">Atari</option>
+            </select>
+          </div>
+          <div class="row" data-palette>
+            <label for="pixelSize">Pixel size</label>
+            <input type="range" id="pixelSize" min="1" max="16" step="1" value="4">
+            <output for="pixelSize" id="pixelSizeOut">4px</output>
+          </div>
+          <div class="row" data-palette>
+            <label for="ditherStrength">Dither</label>
+            <input type="range" id="ditherStrength" min="0" max="0.3" step="0.005" value="0.06">
+            <input type="text" inputmode="decimal" class="value-input" id="ditherStrengthOut" value="0.060" aria-label="Dither strength value">
           </div>
 
+          <div class="row row-check">
+            <input type="checkbox" id="colorGradeToggle">
+            <label for="colorGradeToggle">Color grade</label>
+          </div>
+          <div class="row" data-colorgrade>
+            <label for="colorGradeStyle">Style</label>
+            <select id="colorGradeStyle">
+              <option value="none" selected>None (correction only)</option>
+              <option value="duotone">Duotone</option>
+              <option value="huecycle">Hue cycle</option>
+              <option value="rainbow">Rainbow</option>
+            </select>
+          </div>
+          <div class="row" data-colorgrade>
+            <label for="cgBrightness">Brightness</label>
+            <input type="range" id="cgBrightness" min="0" max="2" step="0.05" value="1">
+            <output for="cgBrightness" id="cgBrightnessOut">1.00</output>
+          </div>
+          <div class="row" data-colorgrade>
+            <label for="cgContrast">Contrast</label>
+            <input type="range" id="cgContrast" min="0" max="2" step="0.05" value="1">
+            <output for="cgContrast" id="cgContrastOut">1.00</output>
+          </div>
+          <div class="row" data-colorgrade>
+            <label for="cgSaturation">Saturation</label>
+            <input type="range" id="cgSaturation" min="0" max="2" step="0.05" value="1">
+            <output for="cgSaturation" id="cgSaturationOut">1.00</output>
+          </div>
+          <div class="row" data-colorgrade>
+            <label for="cgHue">Hue offset</label>
+            <input type="range" id="cgHue" min="0" max="1" step="0.01" value="0">
+            <output for="cgHue" id="cgHueOut">0°</output>
+          </div>
+          <div class="row" data-colorgrade>
+            <label for="cgSpeed">Cycle speed</label>
+            <input type="range" id="cgSpeed" min="0" max="3" step="0.05" value="1">
+            <output for="cgSpeed" id="cgSpeedOut">1.00</output>
+          </div>
+          <div class="row" data-colorgrade-duotone>
+            <label for="cgLightColor">Light color</label>
+            <input type="color" id="cgLightColor" value="#ffe699">
+          </div>
+          <div class="row" data-colorgrade-duotone>
+            <label for="cgDarkColor">Dark color</label>
+            <input type="color" id="cgDarkColor" value="#0d0d33">
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="toneToggle">
+            <label for="toneToggle">Tone</label>
+          </div>
+          <div class="row" data-tone>
+            <label for="toneMode">Mode</label>
+            <select id="toneMode">
+              <option value="posterize" selected>Posterize</option>
+              <option value="solarize">Solarize</option>
+              <option value="edges">Edges</option>
+            </select>
+          </div>
+          <div class="row" data-tone-posterize>
+            <label for="toneLevels">Levels</label>
+            <input type="range" id="toneLevels" min="2" max="16" step="1" value="4">
+            <output for="toneLevels" id="toneLevelsOut">4</output>
+          </div>
+          <div class="row" data-tone-solarize>
+            <label for="toneThreshold">Threshold</label>
+            <input type="range" id="toneThreshold" min="0" max="1" step="0.01" value="0.5">
+            <output for="toneThreshold" id="toneThresholdOut">0.50</output>
+          </div>
+          <div class="row" data-tone-edges>
+            <label for="tonePassthru">Passthru</label>
+            <input type="range" id="tonePassthru" min="0" max="1" step="0.01" value="0">
+            <output for="tonePassthru" id="tonePassthruOut">0.00</output>
+          </div>
+          <div class="row" data-tone-edges>
+            <label for="toneEdgeColor">Edge color</label>
+            <input type="color" id="toneEdgeColor" value="#ffffff">
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="repeatToggle">
+            <label for="repeatToggle">Repeat</label>
+          </div>
+          <div class="row" data-repeat>
+            <label for="repeatMode">Mode</label>
+            <select id="repeatMode">
+              <option value="mirror" selected>Mirror</option>
+              <option value="kaleido">Kaleido</option>
+              <option value="tile">Tile</option>
+            </select>
+          </div>
+          <div class="row" data-repeat>
+            <label for="repeatAmount">Amount</label>
+            <input type="range" id="repeatAmount" min="2" max="16" step="1" value="6">
+            <output for="repeatAmount" id="repeatAmountOut">6</output>
+          </div>
+          <div class="row" data-repeat>
+            <label for="repeatAngle">Angle</label>
+            <input type="range" id="repeatAngle" min="0" max="360" step="1" value="0">
+            <output for="repeatAngle" id="repeatAngleOut">0°</output>
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="displaceToggle">
+            <label for="displaceToggle">Glitch displace</label>
+          </div>
+          <div class="row" data-displace>
+            <label for="displaceMode">Mode</label>
+            <select id="displaceMode">
+              <option value="wave" selected>Wave</option>
+              <option value="wobble">Wobble</option>
+              <option value="jitter">Jitter</option>
+              <option value="shake">Shake</option>
+            </select>
+          </div>
+          <div class="row" data-displace>
+            <label for="displaceAmount">Amount</label>
+            <input type="range" id="displaceAmount" min="0" max="5" step="0.1" value="1">
+            <output for="displaceAmount" id="displaceAmountOut">1.0</output>
+          </div>
+          <div class="row" data-displace>
+            <label for="displaceSize">Size</label>
+            <input type="range" id="displaceSize" min="0.1" max="5" step="0.1" value="1">
+            <output for="displaceSize" id="displaceSizeOut">1.0</output>
+          </div>
+          <div class="row" data-displace>
+            <label for="displaceSpeed">Speed</label>
+            <input type="range" id="displaceSpeed" min="0" max="5" step="0.1" value="1">
+            <output for="displaceSpeed" id="displaceSpeedOut">1.0</output>
+          </div>
+          <div class="row" data-displace>
+            <label for="displaceAngle">Angle</label>
+            <input type="range" id="displaceAngle" min="0" max="360" step="1" value="0">
+            <output for="displaceAngle" id="displaceAngleOut">0°</output>
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="afterimageToggle">
+            <label for="afterimageToggle">Trails</label>
+          </div>
+          <div class="row" data-afterimage>
+            <label for="afterimageTrail">Trail length</label>
+            <input type="range" id="afterimageTrail" min="0" max="1" step="0.01" value="0.55">
+            <output for="afterimageTrail" id="afterimageTrailOut">0.55</output>
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="asciiToggle">
+            <label for="asciiToggle">ASCII</label>
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiRamp">Character set</label>
+            <select id="asciiRamp">
+              <option value="classic" selected>Classic</option>
+              <option value="blocks">Blocks</option>
+              <option value="binary">Binary</option>
+              <option value="matrix">Matrix</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row" data-ascii-custom>
+            <label for="asciiCustomRamp">Custom chars</label>
+            <input type="text" id="asciiCustomRamp" placeholder=" .:-=+*#%@" maxlength="32">
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiCellW">Letter width</label>
+            <input type="range" id="asciiCellW" min="3" max="40" step="1" value="8">
+            <input type="text" inputmode="numeric" class="value-input" id="asciiCellWOut" value="8px" aria-label="ASCII letter width">
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiCellH">Letter height</label>
+            <input type="range" id="asciiCellH" min="4" max="48" step="1" value="14">
+            <input type="text" inputmode="numeric" class="value-input" id="asciiCellHOut" value="14px" aria-label="ASCII letter height">
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiSpacing">Letter spacing</label>
+            <input type="range" id="asciiSpacing" min="0" max="0.7" step="0.02" value="0">
+            <input type="text" inputmode="decimal" class="value-input" id="asciiSpacingOut" value="0.00" aria-label="ASCII letter spacing">
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiContrast">Contrast</label>
+            <input type="range" id="asciiContrast" min="0.4" max="3" step="0.05" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="asciiContrastOut" value="1.00" aria-label="ASCII contrast">
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiBrightness">Brightness</label>
+            <input type="range" id="asciiBrightness" min="-0.5" max="0.5" step="0.02" value="0">
+            <input type="text" inputmode="decimal" class="value-input" id="asciiBrightnessOut" value="0.00" aria-label="ASCII brightness">
+          </div>
+          <div class="row" data-ascii>
+            <label for="asciiBgColor">Background</label>
+            <input type="color" id="asciiBgColor" value="#000000">
+          </div>
+          <div class="row row-check" data-ascii>
+            <input type="checkbox" id="asciiColorize">
+            <label for="asciiColorize">Colorize</label>
+          </div>
+          <div class="row row-check" data-ascii>
+            <input type="checkbox" id="asciiInvert">
+            <label for="asciiInvert">Invert (print style)</label>
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="halftoneToggle">
+            <label for="halftoneToggle">Halftone / print</label>
+          </div>
+          <div class="row" data-halftone>
+            <label for="halftoneMode">Mode</label>
+            <select id="halftoneMode">
+              <option value="dots" selected>Dot matrix</option>
+              <option value="cmyk">CMYK half-tone</option>
+              <option value="linocut">LinoCut</option>
+            </select>
+          </div>
+          <div class="row" data-halftone>
+            <label for="halftoneScale">Mark size</label>
+            <input type="range" id="halftoneScale" min="2" max="24" step="1" value="6">
+            <output for="halftoneScale" id="halftoneScaleOut">6px</output>
+          </div>
+          <div class="row" data-halftone>
+            <label for="halftoneAngle">Screen angle</label>
+            <input type="range" id="halftoneAngle" min="0" max="180" step="1" value="0">
+            <output for="halftoneAngle" id="halftoneAngleOut">0°</output>
+          </div>
+          <div class="row row-check" data-halftone>
+            <input type="checkbox" id="halftoneInvert">
+            <label for="halftoneInvert">Invert tone</label>
+          </div>
+
+          <div class="row row-check">
+            <input type="checkbox" id="filmToggle">
+            <label for="filmToggle">Film</label>
+          </div>
+          <div class="row" data-film>
+            <label for="filmPreset">Stock</label>
+            <select id="filmPreset">
+              <option value="super8" selected>Super 8</option>
+              <option value="clean16mm">Clean 16mm</option>
+              <option value="trashed">Trashed</option>
+            </select>
+          </div>
+          <div class="row" data-film>
+            <label for="filmGrain">Grain</label>
+            <input type="range" id="filmGrain" min="0" max="1.5" step="0.05" value="0.5">
+            <output for="filmGrain" id="filmGrainOut">0.50</output>
+          </div>
+          <div class="row" data-film>
+            <label for="filmDust">Dust</label>
+            <input type="range" id="filmDust" min="0" max="1.5" step="0.05" value="0.5">
+            <output for="filmDust" id="filmDustOut">0.50</output>
+          </div>
+          <div class="row" data-film>
+            <label for="filmWeave">Gate weave</label>
+            <input type="range" id="filmWeave" min="0" max="2" step="0.05" value="0.6">
+            <output for="filmWeave" id="filmWeaveOut">0.60</output>
+          </div>
+          <div class="row" data-film>
+            <label for="filmBurn">Light leak</label>
+            <input type="range" id="filmBurn" min="0" max="1.5" step="0.05" value="0.25">
+            <output for="filmBurn" id="filmBurnOut">0.25</output>
+          </div>
+
+          <div class="row" id="styleOrderRow">
+            <label id="styleOrderLabel">Effect chain order</label>
+          </div>
+          <ol id="styleOrderList" class="style-order-list" aria-labelledby="styleOrderLabel"></ol>
+
+          <p class="hint" id="styleHint">
+            Renders through the same post-processing pipeline as ambient
+            occlusion above, and shows up in every screenshot and recorded clip.
+          </p>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-panel" id="tabOutput" role="tabpanel" aria-labelledby="tabBtnOutput" hidden>
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="captureBody">Capture</button></h2>
+          <div class="group-body" id="captureBody" hidden>
           <div class="row row-buttons">
-            <button type="button" id="materialUndo" class="button button-quiet" disabled title="Shortcut: Ctrl+Z">Undo</button>
-            <button type="button" id="materialRedo" class="button button-quiet" disabled title="Shortcut: Ctrl+Shift+Z">Redo</button>
+            <button type="button" id="screenshotButton" class="button" title="Shortcut: S">Screenshot</button>
+          </div>
+          <div class="row row-check">
+            <input type="checkbox" id="shotTransparent">
+            <label for="shotTransparent">Transparent background</label>
+          </div>
+          <div class="row">
+            <label for="shotScale">Resolution</label>
+            <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
+            <output for="shotScale" id="shotScaleOut">1×</output>
+          </div>
+          </div>
+        </section>
+
+        <section class="group" id="cameraPathGroup">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="cameraPathBody">Camera Path</button></h2>
+          <div class="group-body" id="cameraPathBody" hidden>
+          <div class="row">
+            <label for="cpWaypoints">Waypoints</label>
+            <select id="cpWaypoints"></select>
           </div>
           <div class="row row-buttons">
-            <button type="button" id="resetMaterial" class="button button-quiet">Reset</button>
-            <button type="button" id="resetAllMaterials" class="button button-quiet">Reset all</button>
+            <button type="button" id="cpAddWaypoint" class="button button-quiet">Add waypoint here</button>
+            <button type="button" id="cpRemoveWaypoint" class="button button-quiet" disabled>Remove</button>
           </div>
-        </div>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="true" aria-controls="colourwaysBody">Colourways</button></h2>
-        <div class="group-body" id="colourwaysBody">
-        <ul class="colorway-list" id="colorwayList"></ul>
-        <p class="hint" id="colorwayHint">Recolour the materials above, then save the result as a colourway.</p>
-
-        <form id="colorwayForm" class="url-form">
-          <div class="url-field">
-            <input type="text" id="colorwayName" placeholder="Name, e.g. Red" autocomplete="off" maxlength="40">
-            <button type="submit" class="button">Save</button>
+          <div class="row">
+            <label for="cpDuration">Duration</label>
+            <input type="range" id="cpDuration" min="3" max="15" step="1" value="8">
+            <output for="cpDuration" id="cpDurationOut">8s</output>
           </div>
-        </form>
+          <div class="row">
+            <label for="cpAspect">Aspect</label>
+            <select id="cpAspect">
+              <option value="free" selected>Free</option>
+              <option value="9:16">9:16</option>
+              <option value="1:1">1:1</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="cpScrub">Scrub</label>
+            <input type="range" id="cpScrub" min="0" max="1" step="0.001" value="0">
+          </div>
+          <div class="row row-buttons">
+            <button type="button" id="cpPreviewPlay" class="button button-quiet" disabled>▶ Preview</button>
+            <button type="button" id="cpRecord" class="button" disabled>Record clip</button>
+          </div>
+          <p class="hint" id="cameraPathHint">
+            Position the view and click "Add waypoint here" at least twice, then
+            preview or record the camera move between them as a clip.
+          </p>
+          </div>
+        </section>
 
-        <div class="row">
-          <label for="exportScope">Export</label>
-          <select id="exportScope">
-            <option value="all" selected>All colourways</option>
-            <option value="current">Current view only</option>
-          </select>
-        </div>
-        <button type="button" id="exportPngs" class="button">Export PNGs</button>
-        <button type="button" id="exportGlb" class="button button-quiet">Export GLB</button>
-        </div>
-      </section>
+        <section class="group" id="turntableGroup">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="turntableBody">Turntable</button></h2>
+          <div class="group-body" id="turntableBody" hidden>
+          <div class="row">
+            <label for="ttRevolutions">Revolutions</label>
+            <input type="range" id="ttRevolutions" min="1" max="4" step="1" value="1">
+            <output for="ttRevolutions" id="ttRevolutionsOut">1</output>
+          </div>
+          <div class="row">
+            <label for="ttDuration">Duration</label>
+            <input type="range" id="ttDuration" min="2" max="20" step="1" value="6">
+            <output for="ttDuration" id="ttDurationOut">6s</output>
+          </div>
+          <button type="button" id="recordTurntable" class="button">Record turntable</button>
+          <p class="hint" id="turntableHint">
+            Records a WebM. Note that WebM cannot carry transparency — use the
+            colourway PNG export if you need an alpha channel.
+          </p>
+          </div>
+        </section>
+      </div>
 
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="lightingBody">Lighting</button></h2>
-        <div class="group-body" id="lightingBody" hidden>
-        <div class="row">
-          <label for="ambientSlider">Ambient</label>
-          <input type="range" id="ambientSlider" min="0" max="3" step="0.05" value="0.3">
-          <input type="text" inputmode="decimal" class="value-input" id="ambientOut" value="0.30" aria-label="Ambient light value">
-        </div>
-        <div class="row">
-          <label for="sunSlider">Sun</label>
-          <input type="range" id="sunSlider" min="0" max="5" step="0.05" value="1.8">
-          <input type="text" inputmode="decimal" class="value-input" id="sunOut" value="1.80" aria-label="Sun light value">
-        </div>
-        <div class="row">
-          <label for="sunColor">Sun color</label>
-          <input type="color" id="sunColor" value="#ffffff">
-        </div>
-        <div class="row">
-          <label for="leftSlider">Left fill</label>
-          <input type="range" id="leftSlider" min="0" max="30" step="0.1" value="4.5">
-          <input type="text" inputmode="decimal" class="value-input" id="leftOut" value="4.5" aria-label="Left fill light value">
-        </div>
-        <div class="row">
-          <label for="leftColor">Left fill color</label>
-          <input type="color" id="leftColor" value="#b2b2ff">
-        </div>
-        <div class="row">
-          <label for="rightSlider">Right fill</label>
-          <input type="range" id="rightSlider" min="0" max="30" step="0.1" value="2.1">
-          <input type="text" inputmode="decimal" class="value-input" id="rightOut" value="2.1" aria-label="Right fill light value">
-        </div>
-        <div class="row">
-          <label for="rightColor">Right fill color</label>
-          <input type="color" id="rightColor" value="#ff9898">
-        </div>
-        <div class="row">
-          <label for="angleSlider">Sun angle</label>
-          <input type="range" id="angleSlider" min="-90" max="270" step="1" value="53">
-          <input type="text" inputmode="decimal" class="value-input" id="angleOut" value="53°" aria-label="Sun angle value">
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="shadowToggle" checked>
-          <label for="shadowToggle">Shadows</label>
-        </div>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="environmentBody">Environment</button></h2>
-        <div class="group-body" id="environmentBody" hidden>
-        <div class="row">
-          <label for="exposureSlider">Exposure</label>
-          <input type="range" id="exposureSlider" min="0" max="3" step="0.05" value="0.6">
-          <input type="text" inputmode="decimal" class="value-input" id="exposureOut" value="0.60" aria-label="Exposure value">
-        </div>
-        <div class="row">
-          <label for="envIntensity">Env intensity</label>
-          <input type="range" id="envIntensity" min="0" max="3" step="0.05" value="1">
-          <input type="text" inputmode="decimal" class="value-input" id="envIntensityOut" value="1.00" aria-label="Environment intensity value">
-        </div>
-        <div class="row">
-          <label for="envRotation">Env rotation</label>
-          <input type="range" id="envRotation" min="0" max="360" step="1" value="0">
-          <input type="text" inputmode="decimal" class="value-input" id="envRotationOut" value="0°" aria-label="Environment rotation value">
-        </div>
-        <div class="row">
-          <label for="toneMapping">Tone mapping</label>
-          <select id="toneMapping">
-            <option value="agx" selected>AgX</option>
-            <option value="neutral">Neutral</option>
-            <option value="aces">ACES Filmic</option>
-            <option value="reinhard">Reinhard</option>
-            <option value="cineon">Cineon</option>
-            <option value="linear">Linear</option>
-            <option value="none">None</option>
-          </select>
-        </div>
-        <div class="row">
-          <label for="qualityTier">Quality</label>
-          <select id="qualityTier">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="bgToggle" checked>
-          <label for="bgToggle">Show background</label>
-        </div>
-
-        <!-- Contact darkening in seams and crevices is what makes a product
-             read as sitting on the backdrop rather than pasted onto it. It is
-             the main thing separating this from a real-time studio renderer.
-             Off by default: it costs a full extra pass per frame. -->
-        <div class="row row-check">
-          <input type="checkbox" id="aoToggle">
-          <label for="aoToggle">Ambient occlusion</label>
-        </div>
-        <div class="row" data-ao>
-          <label for="aoIntensity">AO strength</label>
-          <input type="range" id="aoIntensity" min="0" max="2" step="0.05" value="1">
-          <input type="text" inputmode="decimal" class="value-input" id="aoIntensityOut" value="1.00" aria-label="AO strength value">
-        </div>
-        <div class="row" data-ao>
-          <label for="aoRadius">AO radius</label>
-          <input type="range" id="aoRadius" min="0.02" max="1" step="0.01" value="0.25">
-          <input type="text" inputmode="decimal" class="value-input" id="aoRadiusOut" value="0.25" aria-label="AO radius value">
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="aaToggle">
-          <label for="aaToggle">Antialiasing (SMAA)</label>
-        </div>
-
-        <!-- Depth of field sits with AO/AA rather than in Style: it is a
-             lens property of the real 3D scene, and it reads scene depth,
-             which only exists ahead of any stylization pass. -->
-        <div class="row row-check">
-          <input type="checkbox" id="dofToggle">
-          <label for="dofToggle">Depth of field</label>
-        </div>
-        <div class="row" data-dof>
-          <label for="dofFocus">Focus distance</label>
-          <input type="range" id="dofFocus" min="0.5" max="60" step="0.5" value="18">
-          <input type="text" inputmode="decimal" class="value-input" id="dofFocusOut" value="18.0" aria-label="Focus distance value">
-        </div>
-        <div class="row" data-dof>
-          <label for="dofAperture">Aperture</label>
-          <input type="range" id="dofAperture" min="0" max="0.02" step="0.0005" value="0.002">
-          <output for="dofAperture" id="dofApertureOut">0.0020</output>
-        </div>
-        <div class="row" data-dof>
-          <label for="dofMaxBlur">Max blur</label>
-          <input type="range" id="dofMaxBlur" min="0" max="0.05" step="0.001" value="0.01">
-          <output for="dofMaxBlur" id="dofMaxBlurOut">0.010</output>
-        </div>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="styleBody">Style</button></h2>
-        <div class="group-body" id="styleBody" hidden>
-        <div class="row" id="styleFpsRow" hidden>
-          <label>Style FPS</label>
-          <output id="styleFpsOut">—</output>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="crtToggle">
-          <label for="crtToggle">CRT</label>
-        </div>
-        <div class="row" data-crt>
-          <label for="crtPreset">CRT look</label>
-          <select id="crtPreset">
-            <option value="arcade" selected>Arcade</option>
-            <option value="vhs">VHS</option>
-            <option value="oldtv">Old TV</option>
-          </select>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="bloomToggle">
-          <label for="bloomToggle">Bloom</label>
-        </div>
-        <div class="row" data-bloom>
-          <label for="bloomStrength">Bloom strength</label>
-          <input type="range" id="bloomStrength" min="0" max="2" step="0.05" value="0.6">
-          <input type="text" inputmode="decimal" class="value-input" id="bloomStrengthOut" value="0.60" aria-label="Bloom strength value">
-        </div>
-        <!-- Threshold is the control that decides WHAT glows, and without it
-             bloom reads as "the whole image is blown out": every pixel above
-             0.7 luminance blooms and the only available response is dimming
-             strength, which also dims the highlights that should bloom. -->
-        <div class="row" data-bloom>
-          <label for="bloomThreshold">Bloom threshold</label>
-          <input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.7">
-          <input type="text" inputmode="decimal" class="value-input" id="bloomThresholdOut" value="0.70" aria-label="Bloom threshold value">
-        </div>
-        <div class="row" data-bloom>
-          <label for="bloomRadius">Bloom radius</label>
-          <input type="range" id="bloomRadius" min="0" max="1" step="0.05" value="0.4">
-          <input type="text" inputmode="decimal" class="value-input" id="bloomRadiusOut" value="0.40" aria-label="Bloom radius value">
-        </div>
-        <p class="hint" data-bloom>
-          Raise the threshold so only genuinely bright areas glow; lower it to
-          bloom the whole frame.
-        </p>
-        <div class="row row-check">
-          <input type="checkbox" id="glitchToggle">
-          <label for="glitchToggle">Glitch</label>
-        </div>
-        <div class="row row-check" data-glitch>
-          <input type="checkbox" id="glitchWild">
-          <label for="glitchWild">Wild mode</label>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="pixelateToggle">
-          <label for="pixelateToggle">Pixelate</label>
-        </div>
-        <div class="row" data-pixelate>
-          <label for="pixelateSize">Pixel size</label>
-          <input type="range" id="pixelateSize" min="2" max="48" step="1" value="6">
-          <input type="text" inputmode="numeric" class="value-input" id="pixelateSizeOut" value="6px" aria-label="Pixel size">
-        </div>
-        <div class="row" data-pixelate>
-          <label for="pixelateAspect">Pixel aspect</label>
-          <input type="range" id="pixelateAspect" min="0.25" max="4" step="0.05" value="1">
-          <input type="text" inputmode="decimal" class="value-input" id="pixelateAspectOut" value="1.00" aria-label="Pixel aspect ratio">
-        </div>
-        <div class="row" data-pixelate>
-          <label for="pixelateGrid">Grid lines</label>
-          <input type="range" id="pixelateGrid" min="0" max="1" step="0.05" value="0">
-          <input type="text" inputmode="decimal" class="value-input" id="pixelateGridOut" value="0.00" aria-label="Pixel grid strength">
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="paletteToggle">
-          <label for="paletteToggle">Retro palette</label>
-        </div>
-        <div class="row" data-palette>
-          <label for="paletteName">Palette</label>
-          <select id="paletteName">
-            <option value="gba" selected>Game Boy</option>
-            <option value="genesis">Genesis</option>
-            <option value="atari">Atari</option>
-          </select>
-        </div>
-        <div class="row" data-palette>
-          <label for="pixelSize">Pixel size</label>
-          <input type="range" id="pixelSize" min="1" max="16" step="1" value="4">
-          <output for="pixelSize" id="pixelSizeOut">4px</output>
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="colorGradeToggle">
-          <label for="colorGradeToggle">Color grade</label>
-        </div>
-        <div class="row" data-colorgrade>
-          <label for="colorGradeStyle">Style</label>
-          <select id="colorGradeStyle">
-            <option value="none" selected>None (correction only)</option>
-            <option value="duotone">Duotone</option>
-            <option value="huecycle">Hue cycle</option>
-            <option value="rainbow">Rainbow</option>
-          </select>
-        </div>
-        <div class="row" data-colorgrade>
-          <label for="cgBrightness">Brightness</label>
-          <input type="range" id="cgBrightness" min="0" max="2" step="0.05" value="1">
-          <output for="cgBrightness" id="cgBrightnessOut">1.00</output>
-        </div>
-        <div class="row" data-colorgrade>
-          <label for="cgContrast">Contrast</label>
-          <input type="range" id="cgContrast" min="0" max="2" step="0.05" value="1">
-          <output for="cgContrast" id="cgContrastOut">1.00</output>
-        </div>
-        <div class="row" data-colorgrade>
-          <label for="cgSaturation">Saturation</label>
-          <input type="range" id="cgSaturation" min="0" max="2" step="0.05" value="1">
-          <output for="cgSaturation" id="cgSaturationOut">1.00</output>
-        </div>
-        <div class="row" data-colorgrade>
-          <label for="cgHue">Hue offset</label>
-          <input type="range" id="cgHue" min="0" max="1" step="0.01" value="0">
-          <output for="cgHue" id="cgHueOut">0°</output>
-        </div>
-        <div class="row" data-colorgrade>
-          <label for="cgSpeed">Cycle speed</label>
-          <input type="range" id="cgSpeed" min="0" max="3" step="0.05" value="1">
-          <output for="cgSpeed" id="cgSpeedOut">1.00</output>
-        </div>
-        <div class="row" data-colorgrade-duotone>
-          <label for="cgLightColor">Light color</label>
-          <input type="color" id="cgLightColor" value="#ffe699">
-        </div>
-        <div class="row" data-colorgrade-duotone>
-          <label for="cgDarkColor">Dark color</label>
-          <input type="color" id="cgDarkColor" value="#0d0d33">
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="toneToggle">
-          <label for="toneToggle">Tone</label>
-        </div>
-        <div class="row" data-tone>
-          <label for="toneMode">Mode</label>
-          <select id="toneMode">
-            <option value="posterize" selected>Posterize</option>
-            <option value="solarize">Solarize</option>
-            <option value="edges">Edges</option>
-          </select>
-        </div>
-        <div class="row" data-tone-posterize>
-          <label for="toneLevels">Levels</label>
-          <input type="range" id="toneLevels" min="2" max="16" step="1" value="4">
-          <output for="toneLevels" id="toneLevelsOut">4</output>
-        </div>
-        <div class="row" data-tone-solarize>
-          <label for="toneThreshold">Threshold</label>
-          <input type="range" id="toneThreshold" min="0" max="1" step="0.01" value="0.5">
-          <output for="toneThreshold" id="toneThresholdOut">0.50</output>
-        </div>
-        <div class="row" data-tone-edges>
-          <label for="tonePassthru">Passthru</label>
-          <input type="range" id="tonePassthru" min="0" max="1" step="0.01" value="0">
-          <output for="tonePassthru" id="tonePassthruOut">0.00</output>
-        </div>
-        <div class="row" data-tone-edges>
-          <label for="toneEdgeColor">Edge color</label>
-          <input type="color" id="toneEdgeColor" value="#ffffff">
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="repeatToggle">
-          <label for="repeatToggle">Repeat</label>
-        </div>
-        <div class="row" data-repeat>
-          <label for="repeatMode">Mode</label>
-          <select id="repeatMode">
-            <option value="mirror" selected>Mirror</option>
-            <option value="kaleido">Kaleido</option>
-            <option value="tile">Tile</option>
-          </select>
-        </div>
-        <div class="row" data-repeat>
-          <label for="repeatAmount">Amount</label>
-          <input type="range" id="repeatAmount" min="2" max="16" step="1" value="6">
-          <output for="repeatAmount" id="repeatAmountOut">6</output>
-        </div>
-        <div class="row" data-repeat>
-          <label for="repeatAngle">Angle</label>
-          <input type="range" id="repeatAngle" min="0" max="360" step="1" value="0">
-          <output for="repeatAngle" id="repeatAngleOut">0°</output>
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="displaceToggle">
-          <label for="displaceToggle">Glitch displace</label>
-        </div>
-        <div class="row" data-displace>
-          <label for="displaceMode">Mode</label>
-          <select id="displaceMode">
-            <option value="wave" selected>Wave</option>
-            <option value="wobble">Wobble</option>
-            <option value="jitter">Jitter</option>
-            <option value="shake">Shake</option>
-          </select>
-        </div>
-        <div class="row" data-displace>
-          <label for="displaceAmount">Amount</label>
-          <input type="range" id="displaceAmount" min="0" max="5" step="0.1" value="1">
-          <output for="displaceAmount" id="displaceAmountOut">1.0</output>
-        </div>
-        <div class="row" data-displace>
-          <label for="displaceSize">Size</label>
-          <input type="range" id="displaceSize" min="0.1" max="5" step="0.1" value="1">
-          <output for="displaceSize" id="displaceSizeOut">1.0</output>
-        </div>
-        <div class="row" data-displace>
-          <label for="displaceSpeed">Speed</label>
-          <input type="range" id="displaceSpeed" min="0" max="5" step="0.1" value="1">
-          <output for="displaceSpeed" id="displaceSpeedOut">1.0</output>
-        </div>
-        <div class="row" data-displace>
-          <label for="displaceAngle">Angle</label>
-          <input type="range" id="displaceAngle" min="0" max="360" step="1" value="0">
-          <output for="displaceAngle" id="displaceAngleOut">0°</output>
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="afterimageToggle">
-          <label for="afterimageToggle">Trails</label>
-        </div>
-        <div class="row" data-afterimage>
-          <label for="afterimageTrail">Trail length</label>
-          <input type="range" id="afterimageTrail" min="0" max="1" step="0.01" value="0.55">
-          <output for="afterimageTrail" id="afterimageTrailOut">0.55</output>
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="asciiToggle">
-          <label for="asciiToggle">ASCII</label>
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiRamp">Character set</label>
-          <select id="asciiRamp">
-            <option value="classic" selected>Classic</option>
-            <option value="blocks">Blocks</option>
-            <option value="binary">Binary</option>
-            <option value="matrix">Matrix</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row" data-ascii-custom>
-          <label for="asciiCustomRamp">Custom chars</label>
-          <input type="text" id="asciiCustomRamp" placeholder=" .:-=+*#%@" maxlength="32">
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiCellW">Letter width</label>
-          <input type="range" id="asciiCellW" min="3" max="40" step="1" value="8">
-          <input type="text" inputmode="numeric" class="value-input" id="asciiCellWOut" value="8px" aria-label="ASCII letter width">
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiCellH">Letter height</label>
-          <input type="range" id="asciiCellH" min="4" max="48" step="1" value="14">
-          <input type="text" inputmode="numeric" class="value-input" id="asciiCellHOut" value="14px" aria-label="ASCII letter height">
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiSpacing">Letter spacing</label>
-          <input type="range" id="asciiSpacing" min="0" max="0.7" step="0.02" value="0">
-          <input type="text" inputmode="decimal" class="value-input" id="asciiSpacingOut" value="0.00" aria-label="ASCII letter spacing">
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiContrast">Contrast</label>
-          <input type="range" id="asciiContrast" min="0.4" max="3" step="0.05" value="1">
-          <input type="text" inputmode="decimal" class="value-input" id="asciiContrastOut" value="1.00" aria-label="ASCII contrast">
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiBrightness">Brightness</label>
-          <input type="range" id="asciiBrightness" min="-0.5" max="0.5" step="0.02" value="0">
-          <input type="text" inputmode="decimal" class="value-input" id="asciiBrightnessOut" value="0.00" aria-label="ASCII brightness">
-        </div>
-        <div class="row" data-ascii>
-          <label for="asciiBgColor">Background</label>
-          <input type="color" id="asciiBgColor" value="#000000">
-        </div>
-        <div class="row row-check" data-ascii>
-          <input type="checkbox" id="asciiColorize">
-          <label for="asciiColorize">Colorize</label>
-        </div>
-        <div class="row row-check" data-ascii>
-          <input type="checkbox" id="asciiInvert">
-          <label for="asciiInvert">Invert (print style)</label>
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="halftoneToggle">
-          <label for="halftoneToggle">Halftone / print</label>
-        </div>
-        <div class="row" data-halftone>
-          <label for="halftoneMode">Mode</label>
-          <select id="halftoneMode">
-            <option value="dots" selected>Dot matrix</option>
-            <option value="cmyk">CMYK half-tone</option>
-            <option value="linocut">LinoCut</option>
-          </select>
-        </div>
-        <div class="row" data-halftone>
-          <label for="halftoneScale">Mark size</label>
-          <input type="range" id="halftoneScale" min="2" max="24" step="1" value="6">
-          <output for="halftoneScale" id="halftoneScaleOut">6px</output>
-        </div>
-        <div class="row" data-halftone>
-          <label for="halftoneAngle">Screen angle</label>
-          <input type="range" id="halftoneAngle" min="0" max="180" step="1" value="0">
-          <output for="halftoneAngle" id="halftoneAngleOut">0°</output>
-        </div>
-        <div class="row row-check" data-halftone>
-          <input type="checkbox" id="halftoneInvert">
-          <label for="halftoneInvert">Invert tone</label>
-        </div>
-
-        <div class="row row-check">
-          <input type="checkbox" id="filmToggle">
-          <label for="filmToggle">Film</label>
-        </div>
-        <div class="row" data-film>
-          <label for="filmPreset">Stock</label>
-          <select id="filmPreset">
-            <option value="super8" selected>Super 8</option>
-            <option value="clean16mm">Clean 16mm</option>
-            <option value="trashed">Trashed</option>
-          </select>
-        </div>
-        <div class="row" data-film>
-          <label for="filmGrain">Grain</label>
-          <input type="range" id="filmGrain" min="0" max="1.5" step="0.05" value="0.5">
-          <output for="filmGrain" id="filmGrainOut">0.50</output>
-        </div>
-        <div class="row" data-film>
-          <label for="filmDust">Dust</label>
-          <input type="range" id="filmDust" min="0" max="1.5" step="0.05" value="0.5">
-          <output for="filmDust" id="filmDustOut">0.50</output>
-        </div>
-        <div class="row" data-film>
-          <label for="filmWeave">Gate weave</label>
-          <input type="range" id="filmWeave" min="0" max="2" step="0.05" value="0.6">
-          <output for="filmWeave" id="filmWeaveOut">0.60</output>
-        </div>
-        <div class="row" data-film>
-          <label for="filmBurn">Light leak</label>
-          <input type="range" id="filmBurn" min="0" max="1.5" step="0.05" value="0.25">
-          <output for="filmBurn" id="filmBurnOut">0.25</output>
-        </div>
-
-        <div class="row" id="styleOrderRow">
-          <label id="styleOrderLabel">Effect chain order</label>
-        </div>
-        <ol id="styleOrderList" class="style-order-list" aria-labelledby="styleOrderLabel"></ol>
-
-        <p class="hint" id="styleHint">
-          Renders through the same post-processing pipeline as ambient
-          occlusion above, and shows up in every screenshot and recorded clip.
-        </p>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="captureBody">Capture</button></h2>
-        <div class="group-body" id="captureBody" hidden>
-        <div class="row row-buttons">
-          <button type="button" id="screenshotButton" class="button" title="Shortcut: S">Screenshot</button>
-        </div>
-        <div class="row row-check">
-          <input type="checkbox" id="shotTransparent">
-          <label for="shotTransparent">Transparent background</label>
-        </div>
-        <div class="row">
-          <label for="shotScale">Resolution</label>
-          <input type="range" id="shotScale" min="1" max="4" step="1" value="1">
-          <output for="shotScale" id="shotScaleOut">1×</output>
-        </div>
-        </div>
-      </section>
-
-      <section class="group" id="cameraPathGroup">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="cameraPathBody">Camera Path</button></h2>
-        <div class="group-body" id="cameraPathBody" hidden>
-        <div class="row">
-          <label for="cpWaypoints">Waypoints</label>
-          <select id="cpWaypoints"></select>
-        </div>
-        <div class="row row-buttons">
-          <button type="button" id="cpAddWaypoint" class="button button-quiet">Add waypoint here</button>
-          <button type="button" id="cpRemoveWaypoint" class="button button-quiet" disabled>Remove</button>
-        </div>
-        <div class="row">
-          <label for="cpDuration">Duration</label>
-          <input type="range" id="cpDuration" min="3" max="15" step="1" value="8">
-          <output for="cpDuration" id="cpDurationOut">8s</output>
-        </div>
-        <div class="row">
-          <label for="cpAspect">Aspect</label>
-          <select id="cpAspect">
-            <option value="free" selected>Free</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
-          </select>
-        </div>
-        <div class="row">
-          <label for="cpScrub">Scrub</label>
-          <input type="range" id="cpScrub" min="0" max="1" step="0.001" value="0">
-        </div>
-        <div class="row row-buttons">
-          <button type="button" id="cpPreviewPlay" class="button button-quiet" disabled>▶ Preview</button>
-          <button type="button" id="cpRecord" class="button" disabled>Record clip</button>
-        </div>
-        <p class="hint" id="cameraPathHint">
-          Position the view and click "Add waypoint here" at least twice, then
-          preview or record the camera move between them as a clip.
-        </p>
-        </div>
-      </section>
-
-      <section class="group" id="turntableGroup">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="turntableBody">Turntable</button></h2>
-        <div class="group-body" id="turntableBody" hidden>
-        <div class="row">
-          <label for="ttRevolutions">Revolutions</label>
-          <input type="range" id="ttRevolutions" min="1" max="4" step="1" value="1">
-          <output for="ttRevolutions" id="ttRevolutionsOut">1</output>
-        </div>
-        <div class="row">
-          <label for="ttDuration">Duration</label>
-          <input type="range" id="ttDuration" min="2" max="20" step="1" value="6">
-          <output for="ttDuration" id="ttDurationOut">6s</output>
-        </div>
-        <button type="button" id="recordTurntable" class="button">Record turntable</button>
-        <p class="hint" id="turntableHint">
-          Records a WebM. Note that WebM cannot carry transparency — use the
-          colourway PNG export if you need an alpha channel.
-        </p>
-        </div>
-      </section>
-
-      <section class="group">
-        <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="statsBody">Stats</button></h2>
-        <div class="group-body" id="statsBody" hidden>
-        <dl class="stats" id="stats">
-          <dt>FPS</dt><dd id="statFps">—</dd>
-          <dt>Triangles</dt><dd id="statTris">—</dd>
-          <dt>Vertices</dt><dd id="statVerts">—</dd>
-          <dt>Meshes</dt><dd id="statMeshes">—</dd>
-          <dt>Materials</dt><dd id="statMaterials">—</dd>
-          <dt>Draw calls</dt><dd id="statCalls">—</dd>
-          <dt>Textures</dt><dd id="statTextures">—</dd>
-          <dt>Simplified</dt><dd id="statSimplify">—</dd>
-        </dl>
-        <div class="row row-check">
-          <input type="checkbox" id="simplifyToggle" checked>
-          <label for="simplifyToggle" title="Takes effect on the next model loaded">Simplify dense models</label>
-        </div>
-        <div class="row">
-          <label for="simplifyBudget">Triangle budget</label>
-          <input type="range" id="simplifyBudget" min="50000" max="2000000" step="10000" value="500000">
-          <input type="text" inputmode="numeric" class="value-input" id="simplifyBudgetOut" value="500000" aria-label="Triangle budget value">
-        </div>
-        <p class="hint" id="simplifyHint">
-          Automatically reduces triangle count above the budget when a model
-          loads. Off, or a higher budget, applies from the next load onward.
-        </p>
-        </div>
-      </section>
+      <div class="tab-panel" id="tabInfo" role="tabpanel" aria-labelledby="tabBtnInfo" hidden>
+        <section class="group">
+          <h2 class="group-heading"><button type="button" class="group-title" aria-expanded="false" aria-controls="statsBody">Stats</button></h2>
+          <div class="group-body" id="statsBody" hidden>
+          <dl class="stats" id="stats">
+            <dt>FPS</dt><dd id="statFps">—</dd>
+            <dt>Triangles</dt><dd id="statTris">—</dd>
+            <dt>Vertices</dt><dd id="statVerts">—</dd>
+            <dt>Meshes</dt><dd id="statMeshes">—</dd>
+            <dt>Materials</dt><dd id="statMaterials">—</dd>
+            <dt>Draw calls</dt><dd id="statCalls">—</dd>
+            <dt>Textures</dt><dd id="statTextures">—</dd>
+            <dt>Simplified</dt><dd id="statSimplify">—</dd>
+          </dl>
+          <div class="row row-check">
+            <input type="checkbox" id="simplifyToggle" checked>
+            <label for="simplifyToggle" title="Takes effect on the next model loaded">Simplify dense models</label>
+          </div>
+          <div class="row">
+            <label for="simplifyBudget">Triangle budget</label>
+            <input type="range" id="simplifyBudget" min="50000" max="2000000" step="10000" value="500000">
+            <input type="text" inputmode="numeric" class="value-input" id="simplifyBudgetOut" value="500000" aria-label="Triangle budget value">
+          </div>
+          <p class="hint" id="simplifyHint">
+            Automatically reduces triangle count above the budget when a model
+            loads. Off, or a higher budget, applies from the next load onward.
+          </p>
+          </div>
+        </section>
+      </div>
 
       <div class="row row-buttons panel-reset">
         <button type="button" id="resetSettings" class="button button-quiet"
