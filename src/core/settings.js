@@ -30,6 +30,10 @@ const FIELDS = [
   { id: 'leftSlider', kind: 'range' },
   { id: 'rightSlider', kind: 'range' },
   { id: 'angleSlider', kind: 'range' },
+  { id: 'elevationSlider', kind: 'range' },
+  { id: 'shadowSoftness', kind: 'range' },
+  { id: 'shadowOpacity', kind: 'range' },
+  { id: 'fovSlider', kind: 'range' },
   { id: 'sunColor', kind: 'color' },
   { id: 'leftColor', kind: 'color' },
   { id: 'rightColor', kind: 'color' },
@@ -190,6 +194,9 @@ function writeField({ id, kind }, value) {
  *   tab was active. Not a FIELDS entry: it is a key, not a control's value.
  * @param {object} options.orientation From viewer.orientation — for restoring
  *   the up-axis preset only (see the file header for why not the fine angles).
+ * @param {object} [options.keyframes] From createKeyframes() — its tracks are
+ *   saved with the session. Optional because settings is built before
+ *   keyframes (which needs settings), so it is attached afterwards.
  * @param {object} options.post        From viewer.post — for restoring the
  *   Style effect chain's composite order (Track 5.2). Not a FIELDS entry:
  *   it's a permutation of effect keys, not a single DOM element's value.
@@ -212,6 +219,7 @@ export function createSettings({ accordion, tabs, orientation, post }) {
       upAxis: orientation.preset,
       styleOrder: post.styleOrder,
       activeTab: tabs.active(),
+      keyframes: keyframeStore?.toJSON() ?? {},
       sections: Object.fromEntries(
         accordion.sectionIds().map((id) => [id, accordion.isSectionOpen(id)]),
       ),
@@ -255,6 +263,10 @@ export function createSettings({ accordion, tabs, orientation, post }) {
     }
 
     if (data.activeTab) tabs.activate(data.activeTab);
+
+    // After the fields, so a restored animation is not immediately overwritten
+    // by the plain values those fields hold.
+    if (data.keyframes) keyframeStore?.fromJSON(data.keyframes);
   }
 
   /**
@@ -292,6 +304,10 @@ export function createSettings({ accordion, tabs, orientation, post }) {
   // keep - and the last one written would win, leaving the saved session
   // showing wherever the playhead happened to stop.
   let suspended = false;
+
+  // Attached after construction: keyframes.js needs settings, so settings
+  // cannot require it up front without a circular dependency.
+  let keyframeStore = null;
 
   function reset() {
     for (const field of FIELDS) writeField(field, shippedDefaults[field.id]);
@@ -365,6 +381,11 @@ export function createSettings({ accordion, tabs, orientation, post }) {
     writeFieldById(id, value) {
       const field = FIELD_BY_ID.get(id);
       if (field) writeField(field, value);
+    },
+
+    /** Late-bind the keyframe store, so its tracks save with the session. */
+    attachKeyframes(store) {
+      keyframeStore = store;
     },
 
     /** Stop auto-saving. Paired with resume(); see the flag's own comment. */

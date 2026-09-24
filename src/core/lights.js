@@ -48,7 +48,13 @@ export const LIGHT_DEFAULTS = {
   left: 4.5,
   right: 2.1,
   exposure: 0.6,
-  angle: 53, // degrees, drives the sun's position around the subject
+  angle: 53, // degrees of azimuth: the sun's compass bearing around the subject
+  // Degrees above the horizon. The rig used to pin this at a fixed height,
+  // which meant the single most expressive lighting move - dropping the sun
+  // for a raking, long-shadowed look, or lifting it toward noon - could not be
+  // made at all. 58 is roughly where the fixed height sat, so the default rig
+  // is unchanged.
+  elevation: 58,
   // Colours were hardcoded at construction until now (a cool left fill, a warm
   // right one - a conventional cross-lit product setup) with no way to change
   // them. They live here so the rig, the UI's initial values and the settings
@@ -134,14 +140,26 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
   scene.add(shadowCatcher);
 
   let angle = LIGHT_DEFAULTS.angle;
+  let elevation = LIGHT_DEFAULTS.elevation;
 
   /** Place the sun on a circle around the subject at `angle` degrees. */
+  /**
+   * Place the sun on a sphere around the subject: azimuth around, elevation up.
+   *
+   * Previously this was a circle at a fixed height, so the angle slider only
+   * ever swung the sun horizontally. Proper spherical placement means the
+   * horizontal radius has to shrink as the light rises (cos) while its height
+   * grows (sin), or the light would swing outward as it climbed instead of
+   * arcing overhead.
+   */
   function applySunPosition() {
-    const rad = MathUtils.degToRad(angle);
+    const azimuth = MathUtils.degToRad(angle);
+    const alt = MathUtils.degToRad(elevation);
+    const horizontal = rigRadius * Math.cos(alt);
     sun.position.set(
-      rigRadius * Math.cos(rad),
-      rigRadius * 0.85,
-      rigRadius * Math.sin(rad),
+      horizontal * Math.cos(azimuth),
+      rigRadius * Math.sin(alt),
+      horizontal * Math.sin(azimuth),
     );
   }
 
@@ -182,6 +200,45 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
     fitShadowCamera(sun, object);
   }
 
+  /**
+   * How dark the cast shadow is, 0..1.
+   *
+   * Applies to the shadow catcher's own material, which is what AR and any
+   * stage-less scene actually uses. Contact shadow strength is most of what
+   * sells a subject as sitting on a surface rather than floating above it, and
+   * it was previously fixed at 0.5 with no way to reach it.
+   */
+  function setShadowOpacity(value) {
+    // Both, because the shadow lands in two different places depending on the
+    // scene. Setting only the catcher's opacity was the first attempt and did
+    // nothing visible: the catcher is hidden by default, since Stage.glb
+    // normally receives the shadow instead, so the dial moved a property on an
+    // invisible mesh. LightShadow.intensity darkens the cast shadow wherever it
+    // falls, which covers the stage; the catcher's opacity still matters for AR
+    // and for any stage-less scene, so it tracks the same value.
+    sun.shadow.intensity = value;
+    // Scaled so the catcher, which is a plain dark plane rather than a lit
+    // surface, does not read as much heavier than the stage at the same number.
+    shadowCatcher.material.opacity = value * 0.8;
+    requestShadowUpdate();
+    invalidate(2);
+  }
+
+  /**
+   * Shadow edge softness, as a blur radius on the shadow map.
+   *
+   * PCFShadowMap samples a neighbourhood around each texel, so a larger radius
+   * spreads the penumbra. It is not physically a light size - a real soft
+   * shadow comes from a large emitter - but it is the dial that exists, and it
+   * covers the range between a hard product-catalogue shadow and a diffuse
+   * overcast one.
+   */
+  function setShadowSoftness(value) {
+    sun.shadow.radius = value;
+    requestShadowUpdate();
+    invalidate(2);
+  }
+
   /** Re-render the shadow map on the next frame. */
   function requestShadowUpdate() {
     sun.shadow.needsUpdate = true;
@@ -213,6 +270,8 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
     fitTo,
     requestShadowUpdate,
     setShadowMapSize,
+    setShadowOpacity,
+    setShadowSoftness,
 
     setAmbient(v) {
       ambient.intensity = v;
@@ -247,6 +306,18 @@ export function createLightRig(scene, { invalidate = () => {}, shadowMapSize = 2
       right.color.set(hex);
       invalidate();
     },
+    /** Degrees above the horizon. Low rakes and lengthens, high flattens. */
+    setElevation(degrees) {
+      elevation = degrees;
+      applySunPosition();
+      requestShadowUpdate();
+      invalidate(2);
+    },
+
+    getElevation() {
+      return elevation;
+    },
+
     setAngle(degrees) {
       angle = degrees;
       applySunPosition();

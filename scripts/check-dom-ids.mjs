@@ -16,6 +16,20 @@ const root = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '
 const html = readFileSync(join(root, 'index.html'), 'utf8');
 const htmlIds = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
 
+// Duplicate ids are worse than missing ones, because nothing fails loudly:
+// getElementById returns the first match, so the second element is simply
+// unreachable and any style keyed to that id lands on the wrong node. Added
+// after a new keyframe timeline reused "timeline", which the animation clip
+// scrubber already owned - the tests saw an element that would never hide, and
+// the new CSS quietly restyled the scrubber.
+const allHtmlIds = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+const duplicateIds = [...new Set(allHtmlIds.filter((id, i) => allHtmlIds.indexOf(id) !== i))];
+if (duplicateIds.length > 0) {
+  console.error(`Duplicate DOM ids in index.html: ${duplicateIds.join(', ')}`);
+  console.error('  getElementById only ever returns the first, so the rest are dead.');
+  process.exit(1);
+}
+
 function walk(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {

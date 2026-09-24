@@ -553,6 +553,84 @@ input[type='checkbox'] {
   font-size: 11px;
 }
 
+/* --- timeline ------------------------------------------------------------ */
+/* Lanes are positioned in percentages so the whole thing reflows with the
+   panel and needs no resize handling - the same reason the frame guide does
+   its own measuring but this does not. */
+
+.kf-timeline {
+  position: relative;
+  margin: 0 0 8px;
+  padding: 6px 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.tl-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tl-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+.tl-name {
+  flex: 0 0 5.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.tl-lane {
+  position: relative;
+  flex: 1 1 auto;
+  height: 16px;
+  background: var(--surface);
+  border-radius: 3px;
+  cursor: crosshair;
+}
+
+.tl-key {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  /* translate(-50%, -50%) so `left` is the key's centre rather than its edge -
+     otherwise every key reads as sitting slightly late. */
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--accent);
+  border: 1px solid var(--accent-text);
+  border-radius: 2px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.tl-key:hover { background: var(--accent-hover); }
+.tl-key:active { cursor: grabbing; }
+
+/* Spans the lanes, not the label column, so it lines up with the times the
+   keys are drawn at. */
+.tl-playhead {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 1px;
+  margin-left: calc(5.5rem + 12px);
+  background: var(--danger);
+  pointer-events: none;
+  z-index: 2;
+}
+
 /* --- keyframe tracks ----------------------------------------------------- */
 
 .kf-track-list {

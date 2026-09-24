@@ -582,6 +582,71 @@ check(
   await page.evaluate(() => document.querySelector('.frame-guide').hidden),
 );
 
+// --- lens and light shaping ------------------------------------------------
+//
+// The three controls that decide what the image looks like, all of which were
+// fixed constants until now: every render came out of the same 50 degree lens,
+// the sun could only swing horizontally at one fixed height, and shadow
+// character was not reachable at all.
+
+console.log('\nLens and light shaping');
+
+// Changing the lens must re-frame, not resize the subject. A photographer
+// swapping lenses is choosing a look, not a crop - so a telephoto has to back
+// the camera off and a wide angle has to move it in.
+const lens = await page.evaluate(() => {
+  const v = window.__viewer;
+  const at = (fov) => {
+    v.setFov(fov);
+    return Number(v.camera.position.distanceTo(v.controls.target).toFixed(2));
+  };
+  const tele = at(20);
+  const wide = at(80);
+  v.setFov(50);
+  return { tele, wide, restored: v.fov };
+}); 
+check('a telephoto lens backs the camera off', lens.tele > lens.wide * 2,
+  `20deg at ${lens.tele}, 80deg at ${lens.wide}`);
+check('the lens setting is readable back', lens.restored === 50, String(lens.restored));
+
+// The sun used to sit at a fixed height, so the most expressive lighting move
+// available - raking low, or lifting toward noon - could not be made.
+const sun = await page.evaluate(() => {
+  const l = window.__viewer.lights;
+  l.setElevation(10);
+  const low = Number(l.sun.position.y.toFixed(2));
+  l.setElevation(85);
+  const high = Number(l.sun.position.y.toFixed(2));
+  l.setElevation(58);
+  return { low, high };
+});
+check('the sun rises and falls', sun.high > sun.low * 3, `y ${sun.low} -> ${sun.high}`);
+
+await imageChangesWhen(
+  'sun height',
+  () => { window.__viewer.lights.setElevation(12); window.__viewer.loop.invalidate(3); },
+  () => { window.__viewer.lights.setElevation(58); window.__viewer.loop.invalidate(3); },
+);
+
+// Shadow strength goes through LightShadow.intensity, not just the shadow
+// catcher's opacity: the catcher is hidden whenever Stage.glb is receiving the
+// shadow instead, so setting only that moved a property on an invisible mesh
+// and changed nothing on screen.
+await imageChangesWhen(
+  'shadow strength',
+  () => { window.__viewer.lights.setShadowOpacity(1); window.__viewer.loop.invalidate(3); },
+  () => { window.__viewer.lights.setShadowOpacity(0.5); window.__viewer.loop.invalidate(3); },
+);
+
+const softness = await page.evaluate(() => {
+  const l = window.__viewer.lights;
+  l.setShadowSoftness(9);
+  const set = l.sun.shadow.radius;
+  l.setShadowSoftness(1);
+  return set;
+});
+check('shadow softness reaches the shadow map', softness === 9, String(softness));
+
 // --- saved views (Phase 8) ------------------------------------------------
 //
 // Five one-click views. They go through frameCamera()'s existing distance,

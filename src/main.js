@@ -32,6 +32,7 @@ import { trackObjectUrl, revokeObjectUrl } from './core/dispose.js';
 import { recordTurntable, isTurntableSupported } from './core/turntable.js';
 import { createCameraPath } from './core/camera-path.js';
 import { createKeyframes } from './core/keyframes.js';
+import { createTimeline } from './ui/timeline.js';
 import { createCameraPathPanel } from './ui/camera-path-panel.js';
 import { isClipRecordingSupported } from './core/recorder.js';
 import { createMaterialUndo } from './core/material-undo.js';
@@ -119,8 +120,18 @@ let rebuildKeyframeList = () => {};
 // clock, keyframes are a second track on that same clock.
 const keyframes = createKeyframes({
   settings,
-  onChange: () => rebuildKeyframeList(),
+  onChange: () => {
+    rebuildKeyframeList();
+    // Persist on an actual change, not on every redraw. Redrawing also happens
+    // once during wiring - which runs BEFORE settings.load() - so saving from
+    // there wrote an empty track set over the stored one and load() then read
+    // back nothing. An animation that vanishes on reload while every other
+    // setting survives is exactly the inconsistency this is meant to avoid.
+    settings.save();
+  },
 });
+
+settings.attachKeyframes(keyframes);
 
 const cameraPath = createCameraPath({
   viewer,
@@ -494,6 +505,10 @@ function syncStageRows() {
 syncStageRows();
 bindCheckbox('wireframe', (on) => viewer.setWireframe(on));
 $('frameButton').addEventListener('click', () => viewer.frame());
+// Framing follows the lens, so this re-fits rather than just widening the
+// angle - see viewer.setFov().
+bindSlider('fovSlider', (v) => viewer.setFov(v), (v) => `${Math.round(v)}°`);
+
 $('resetButton').addEventListener('click', () => viewer.resetCamera());
 
 // --- keyframes -----------------------------------------------------------
@@ -526,10 +541,46 @@ function handleArmedEdit(event) {
 $('panelBody').addEventListener('input', handleArmedEdit);
 $('panelBody').addEventListener('change', handleArmedEdit);
 
+/**
+ * Arming controls whether new edits are captured. It must NOT control whether
+ * an existing animation is visible.
+ *
+ * Those were the same flag at first, which meant a restored session showed no
+ * timeline and no track list while its keyframes still drove every scrub and
+ * every recording - state that is live but unreachable, which is the exact
+ * failure mode this project rejected a Pro/Open mode split over. The two
+ * concerns are now separate: [data-kf] follows the arm switch, [data-kf-tracks]
+ * follows whether any keys exist.
+ */
 function syncKeyframeRows() {
-  const on = $('kfArm').checked;
-  for (const row of document.querySelectorAll('[data-kf]')) row.hidden = !on;
+  const armed = $('kfArm').checked;
+  for (const row of document.querySelectorAll('[data-kf]')) row.hidden = !armed;
+
+  const hasTracks = keyframes.trackCount > 0;
+  for (const row of document.querySelectorAll('[data-kf-tracks]')) row.hidden = !hasTracks;
 }
+
+/** A control's visible label, for the timeline lanes and the track list. */
+function keyframeLabel(id) {
+  return document.querySelector(`label[for="${id}"]`)?.textContent.trim() || id;
+}
+
+const timeline = createTimeline({
+  root: $('kfTimelineRows'),
+  playhead: $('kfTimelinePlayhead'),
+  keyframes,
+  getTime: () => playheadTime(),
+  onSeek: (t) => {
+    const scrub = $('cpScrub');
+    scrub.value = String(t);
+    // Dispatched so the camera path's own scrub handler runs, which is what
+    // drives both the camera and, through onTick, the keyframed values.
+    scrub.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+  labelFor: keyframeLabel,
+});
+
+$('cpScrub').addEventListener('input', () => timeline.renderPlayhead());
 
 rebuildKeyframeList = () => {
   const list = $('kfTrackList');
@@ -569,6 +620,9 @@ rebuildKeyframeList = () => {
 
     list.appendChild(item);
   }
+
+  timeline.render();
+  syncKeyframeRows();
 };
 
 bindCheckbox('kfArm', async (on) => {
@@ -748,12 +802,25 @@ bindSlider('sunSlider', (v) => viewer.lights.setSun(v), fixed2);
 bindSlider('leftSlider', (v) => viewer.lights.setLeft(v), fixed1);
 bindSlider('rightSlider', (v) => viewer.lights.setRight(v), fixed1);
 bindSlider('angleSlider', (v) => viewer.lights.setAngle(v), (v) => `${Math.round(v)}°`);
+bindSlider('elevationSlider', (v) => viewer.lights.setElevation(v), (v) => `${Math.round(v)}°`);
+bindSlider('shadowSoftness', (v) => viewer.lights.setShadowSoftness(v), fixed1);
+bindSlider('shadowOpacity', (v) => viewer.lights.setShadowOpacity(v), fixed2);
 // three's Color.set() takes an '#rrggbb' string directly, so these need no
 // hexToRgbArray() conversion - that helper is for raw shader uniforms.
 $('sunColor').addEventListener('input', (e) => viewer.lights.setSunColor(e.target.value));
 $('leftColor').addEventListener('input', (e) => viewer.lights.setLeftColor(e.target.value));
 $('rightColor').addEventListener('input', (e) => viewer.lights.setRightColor(e.target.value));
-bindCheckbox('shadowToggle', (on) => viewer.setShadowsEnabled(on));
+bindCheckbox('shadowToggle', (on) => {
+  viewer.setShadowsEnabled(on);
+  syncShadowRows();
+});
+
+/** Shadow character only matters while shadows are actually being cast. */
+function syncShadowRows() {
+  const on = $('shadowToggle').checked;
+  for (const row of document.querySelectorAll('[data-shadow]')) row.hidden = !on;
+}
+syncShadowRows();
 
 // Environment
 bindSlider('exposureSlider', (v) => viewer.environment.setExposure(v), fixed2);

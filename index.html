@@ -115,6 +115,11 @@
             <button type="button" id="frameButton" class="button button-quiet" title="Shortcut: F">Frame</button>
             <button type="button" id="resetButton" class="button button-quiet" title="Shortcut: R">Reset cam</button>
           </div>
+          <div class="row">
+            <label for="fovSlider" title="Focal length. Wide exaggerates depth, long compresses and flattens.">Lens</label>
+            <input type="range" id="fovSlider" min="14" max="85" step="1" value="50">
+            <input type="text" inputmode="numeric" class="value-input" id="fovOut" value="50°" aria-label="Field of view in degrees">
+          </div>
           <div class="row row-views" role="group" aria-label="Saved views">
             <button type="button" class="button button-quiet" data-view="front" title="Front view">Front</button>
             <button type="button" class="button button-quiet" data-view="threeQuarter" title="Three-quarter view">¾</button>
@@ -333,6 +338,11 @@
             <input type="color" id="rightColor" value="#ff9898">
           </div>
           <div class="row">
+            <label for="elevationSlider" title="Height above the horizon. Low rakes and lengthens shadows, high flattens them.">Sun height</label>
+            <input type="range" id="elevationSlider" min="5" max="89" step="1" value="58">
+            <input type="text" inputmode="numeric" class="value-input" id="elevationOut" value="58°" aria-label="Sun elevation in degrees">
+          </div>
+          <div class="row">
             <label for="angleSlider">Sun angle</label>
             <input type="range" id="angleSlider" min="-90" max="270" step="1" value="53">
             <input type="text" inputmode="decimal" class="value-input" id="angleOut" value="53°" aria-label="Sun angle value">
@@ -340,6 +350,16 @@
           <div class="row row-check">
             <input type="checkbox" id="shadowToggle" checked>
             <label for="shadowToggle">Shadows</label>
+          </div>
+          <div class="row" data-shadow data-advanced>
+            <label for="shadowSoftness">Shadow softness</label>
+            <input type="range" id="shadowSoftness" min="0" max="12" step="0.5" value="1">
+            <input type="text" inputmode="decimal" class="value-input" id="shadowSoftnessOut" value="1.0" aria-label="Shadow softness">
+          </div>
+          <div class="row" data-shadow data-advanced>
+            <label for="shadowOpacity">Shadow strength</label>
+            <input type="range" id="shadowOpacity" min="0" max="1" step="0.02" value="0.5">
+            <input type="text" inputmode="decimal" class="value-input" id="shadowOpacityOut" value="0.50" aria-label="Shadow strength">
           </div>
           </div>
         </section>
@@ -1056,15 +1076,19 @@
             point. Numbers and colours blend between keys; switches and
             dropdowns jump.
           </p>
-          <div class="row" data-kf>
+          <div class="row" data-kf-tracks>
             <label id="kfTracksLabel">Tracks</label>
             <span class="kf-count" id="kfCount">none</span>
           </div>
-          <ul id="kfTrackList" class="kf-track-list" data-kf aria-labelledby="kfTracksLabel"></ul>
-          <div class="row row-buttons" data-kf>
+          <ul id="kfTrackList" class="kf-track-list" data-kf-tracks aria-labelledby="kfTracksLabel"></ul>
+          <div class="row row-buttons" data-kf-tracks>
             <button type="button" id="kfClear" class="button button-quiet">Clear all keys</button>
           </div>
 
+          <div class="kf-timeline" id="kfTimeline" data-kf-tracks hidden>
+            <div class="tl-playhead" id="kfTimelinePlayhead"></div>
+            <div class="tl-rows" id="kfTimelineRows"></div>
+          </div>
           <div class="row">
             <label for="cpScrub">Scrub</label>
             <input type="range" id="cpScrub" min="0" max="1" step="0.001" value="0">

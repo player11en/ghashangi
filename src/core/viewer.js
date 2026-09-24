@@ -993,6 +993,31 @@ export function createViewer({ container }) {
       loop.invalidate(2);
     },
 
+    /**
+   * Field of view, in degrees.
+   *
+   * A primary creative control rather than a technical one: focal length is
+   * most of the difference between a product shot that reads as aggressive and
+   * one that reads as premium. A wide lens exaggerates depth and flares
+   * perspective; a long one compresses the subject and flattens it. Until this
+   * existed every render in the app came out of the same 50 degree lens.
+   *
+   * Re-framing afterwards is not optional. frameCamera() derives its distance
+   * from the fov, so changing the angle without re-fitting makes the subject
+   * jump size - the thing a photographer changing lenses specifically does not
+   * want, since they are choosing a look, not a crop.
+   */
+    setFov(degrees) {
+      camera.fov = degrees;
+      camera.updateProjectionMatrix();
+      if (current) frameCamera(camera, controls, modelRoot, { keepDirection: true });
+      loop.invalidate(2);
+    },
+
+    get fov() {
+      return camera.fov;
+    },
+
     /** Re-fit the camera to the current subject. */
     frame() {
       if (current) frameCamera(camera, controls, modelRoot, { keepDirection: true });

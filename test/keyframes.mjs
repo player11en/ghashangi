@@ -237,9 +237,16 @@ const toggleSpeed = await page.evaluate(() => {
   window.__keyframes.apply(1);
   return { ms: performance.now() - started, count: window.__viewer.post.styleEffectCount };
 });
-check('a pre-warmed toggle applies within a frame',
-  toggleSpeed.ms < 16 && toggleSpeed.count === 1,
-  `${toggleSpeed.ms.toFixed(1)}ms`);
+// The contract is that the pre-roll left nothing to await, so the effect is
+// already applied by the time apply() returns - not that a software rasterizer
+// under batch load meets a 60fps budget. An earlier version asserted 16ms and
+// failed at 65ms in a batch run, which is the same wall-clock guesswork that
+// settle() was rewritten to stop doing. The count check is the real contract;
+// the generous ceiling still catches what it guards against, since a lost
+// pre-roll means importing every pass module, which takes seconds.
+check('a pre-warmed toggle applies synchronously, with no module load',
+  toggleSpeed.count === 1 && toggleSpeed.ms < 500,
+  `effect active immediately, ${toggleSpeed.ms.toFixed(1)}ms`);
 
 await page.evaluate(() => window.__keyframes.clear());
 
@@ -277,6 +284,112 @@ const roundTrip = await page.evaluate(() => {
 check('tracks survive a JSON round trip',
   roundTrip.tracks === 1 && Math.abs(roundTrip.mid - 1.1) < 0.001,
   `${roundTrip.tracks} track, midpoint ${roundTrip.mid}`);
+
+// --- the timeline ----------------------------------------------------------
+//
+// What turns the engine into something usable: before this, a track list could
+// say "ambient light, 3 keys" and nothing more - no way to see when those keys
+// were, move one, or delete one without clearing the whole track.
+
+console.log('\nTimeline');
+
+await page.evaluate(() => {
+  document.querySelector('.tab[data-tab="output"]').click();
+  const body = document.getElementById('cameraPathBody');
+  if (body.hidden) body.closest('.group').querySelector('.group-title').click();
+  const kf = window.__keyframes;
+  kf.clear();
+  kf.setKey('ambientSlider', 0.2, 0.4);
+  kf.setKey('ambientSlider', 0.8, 1.8);
+});
+await page.waitForTimeout(400);
+
+const drawn = await page.evaluate(() => ({
+  visible: !document.getElementById('kfTimeline').hidden,
+  lanes: document.querySelectorAll('.tl-lane').length,
+  keys: [...document.querySelectorAll('.tl-key')].map((k) => k.style.left),
+  name: document.querySelector('.tl-name')?.textContent,
+}));
+check('the timeline draws a lane per track', drawn.visible && drawn.lanes === 1, `${drawn.lanes} lanes`);
+check('keys are drawn at their times', drawn.keys.join() === '20%,80%', drawn.keys.join(', '));
+check('lanes are labelled with the control name, not its id', drawn.name === 'Ambient', drawn.name);
+
+// Dragging a key is the whole reason for a timeline rather than a list.
+const dragBox = await page.evaluate(() => {
+  const key = document.querySelector('.tl-key');
+  const box = key.getBoundingClientRect();
+  const lane = key.closest('.tl-lane').getBoundingClientRect();
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2, laneX: lane.x, laneW: lane.width };
+});
+await page.mouse.move(dragBox.x, dragBox.y);
+await page.mouse.down();
+await page.mouse.move(dragBox.laneX + dragBox.laneW * 0.6, dragBox.y, { steps: 10 });
+await page.mouse.up();
+await page.waitForTimeout(400);
+
+const dragged = await page.evaluate(() =>
+  window.__keyframes.keysFor('ambientSlider').map((k) => Number(k.t.toFixed(2))));
+check('dragging a key moves it in time', dragged[0] > 0.5 && dragged[0] < 0.7,
+  `keys at ${dragged.join(', ')}`);
+check('the track keeps its other keys', dragged.length === 2, `${dragged.length} keys`);
+
+await page.dblclick('.tl-key');
+await page.waitForTimeout(400);
+const afterDelete = await page.evaluate(() => window.__keyframes.keyCount);
+check('double-clicking a key deletes it', afterDelete === 1, `${afterDelete} keys left`);
+
+// --- persistence -----------------------------------------------------------
+//
+// An animation that vanishes on reload while every other setting survives is
+// the kind of inconsistency people notice immediately. This also pins the
+// ordering bug it exposed: saving from the redraw path wrote an empty track
+// set during wiring, which runs BEFORE load(), so load() then read back
+// nothing. Saving now happens on an actual change instead.
+
+console.log('\nPersistence');
+
+await page.evaluate(() => {
+  const kf = window.__keyframes;
+  kf.setKey('sunSlider', 0.1, 0.5);
+  kf.setKey('sunSlider', 0.9, 4);
+});
+await page.waitForTimeout(600);
+
+const beforeReload = await page.evaluate(() => window.__keyframes.keyCount);
+await page.reload({ waitUntil: 'load', timeout: 60_000 });
+await page.waitForFunction(() => window.__viewer?.model != null, null, { timeout: 60_000 });
+await page.waitForTimeout(1500);
+
+const restored = await page.evaluate(() => ({
+  keys: window.__keyframes.keyCount,
+  tracks: window.__keyframes.trackIds(),
+  armed: document.getElementById('kfArm').checked,
+}));
+check('keyframes survive a reload', restored.keys === beforeReload,
+  `${beforeReload} -> ${restored.keys}`);
+check('every track is restored', restored.tracks.length === 2, restored.tracks.join(', '));
+
+// Arming controls capture, not visibility. A restored animation that is live
+// but unreachable is the failure this project rejected a Pro/Open split over.
+await page.evaluate(() => {
+  document.querySelector('.tab[data-tab="output"]').click();
+  const body = document.getElementById('cameraPathBody');
+  if (body.hidden) body.closest('.group').querySelector('.group-title').click();
+});
+await page.waitForTimeout(400);
+const visibility = await page.evaluate(() => ({
+  timeline: !document.getElementById('kfTimeline').hidden,
+  lanes: document.querySelectorAll('.tl-lane').length,
+  armed: document.getElementById('kfArm').checked,
+}));
+check('a restored animation is visible without re-arming',
+  visibility.timeline && visibility.lanes === 2 && visibility.armed === false,
+  `timeline ${visibility.timeline}, lanes ${visibility.lanes}, armed ${visibility.armed}`);
+
+await page.evaluate(() => window.__keyframes.clear());
+await page.waitForTimeout(300);
+const emptied = await page.evaluate(() => document.getElementById('kfTimeline').hidden);
+check('clearing every track hides the timeline', emptied);
 
 // --- report ----------------------------------------------------------------
 
