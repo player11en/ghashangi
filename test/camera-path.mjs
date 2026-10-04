@@ -181,6 +181,42 @@ if (supported) {
   console.log(`  i  recorded blob: ${recording.size} bytes (frame-data quality not checked here; verify manually in a real browser)`);
 }
 
+// --- clip format -----------------------------------------------------------
+//
+// MP4 is what plays on iOS and imports into editors, so it is what most people
+// actually want - but it is offered rather than assumed. Measured in this
+// browser: MediaRecorder encodes H.264 fine from a 2D canvas and produces zero
+// bytes from a WebGL canvas, while VP9 from that same WebGL canvas produces a
+// valid file. That may be specific to software rendering, but defaulting to a
+// container never once observed producing a file is not a silent trade worth
+// making, so the default is the one with evidence and MP4 has a fallback.
+
+console.log('\nClip format');
+
+const formats = await page.evaluate(async () => {
+  const m = await import('/src/core/recorder.js');
+  return {
+    webm: m.supportedCodec('webm'),
+    mp4: m.supportedCodec('mp4'),
+    fallbackDefault: m.supportedCodec(),
+    webmExt: m.extensionFor('video/webm;codecs=vp9'),
+    mp4Ext: m.extensionFor('video/mp4;codecs=avc1.42E01E'),
+  };
+});
+
+check('asking for webm negotiates a webm codec',
+  String(formats.webm).includes('webm'), formats.webm);
+check('asking for mp4 negotiates an mp4 codec',
+  String(formats.mp4).includes('mp4'), formats.mp4);
+check('the default is the container with evidence behind it',
+  String(formats.fallbackDefault).includes('webm'), formats.fallbackDefault);
+
+// The extension comes from the negotiated type, not an assumption: a file
+// named .webm that actually holds MP4 is one players refuse to open.
+check('the extension follows the container',
+  formats.webmExt === 'webm' && formats.mp4Ext === 'mp4',
+  `${formats.webmExt} / ${formats.mp4Ext}`);
+
 // --- aspect lock (Track 4.6) ------------------------------------------
 
 console.log('\nAspect lock');

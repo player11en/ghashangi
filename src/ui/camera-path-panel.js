@@ -7,6 +7,7 @@
 // rather than inventing a second convention.
 
 import { recordCameraPath, recordStatic } from '../core/camera-path.js';
+import { extensionFor } from '../core/recorder.js';
 import { formatBytes } from './progress.js';
 import { logExport } from '../core/telemetry.js';
 import { withAspectLock, lockAspect, unlockAspect } from './aspect-lock.js';
@@ -46,6 +47,11 @@ export function createCameraPathPanel({
 
   function aspect() {
     return aspectSelect.value;
+  }
+
+  /** The container the user asked for; recordClip falls back if it fails. */
+  function clipFormat() {
+    return $('clipFormat')?.value ?? 'webm';
   }
 
   function syncButtons() {
@@ -155,11 +161,14 @@ export function createCameraPathPanel({
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${(getModelName() || 'model').replace(/\.[^.]+$/, '')}-${suffix}.webm`;
+      // From the blob's own type: the browser decides the container, and a
+      // file named .webm that actually holds MP4 is one players refuse to open.
+      const extension = extensionFor(blob.type);
+      anchor.download = `${(getModelName() || 'model').replace(/\.[^.]+$/, '')}-${suffix}.${extension}`;
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
 
-      logExport('webm');
+      logExport(extension);
       toasts.info(`${what} recorded`, formatBytes(blob.size));
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -181,6 +190,7 @@ export function createCameraPathPanel({
       cameraPath,
       viewer,
       duration: duration(),
+      format: clipFormat(),
       onProgress,
     }),
   }));
@@ -195,6 +205,7 @@ export function createCameraPathPanel({
     record: ({ onProgress }) => recordStatic({
       viewer,
       duration: duration(),
+      format: clipFormat(),
       onProgress,
     }),
   }));

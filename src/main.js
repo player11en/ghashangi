@@ -30,6 +30,7 @@ import {
 import { fetchFromDrive, looksLikeDriveLink, isDriveConfigured } from './sources/drive.js';
 import { trackObjectUrl, revokeObjectUrl } from './core/dispose.js';
 import { recordTurntable, isTurntableSupported } from './core/turntable.js';
+import { extensionFor } from './core/recorder.js';
 import { createCameraPath } from './core/camera-path.js';
 import { createKeyframes } from './core/keyframes.js';
 import { createTimeline } from './ui/timeline.js';
@@ -150,7 +151,7 @@ rebuildWaypointList = cameraPathPanel.rebuildList;
 
 if (!isClipRecordingSupported()) {
   $('cameraPathHint').textContent =
-    'This browser cannot record WebM, so clips can’t be exported here, but Preview still works. Try Chrome or Firefox to record.';
+    'This browser cannot record video, so clips can’t be exported here, but Preview still works. Try Chrome, Edge or Safari to record.';
   $('cameraPathHint').dataset.level = 'warn';
 }
 
@@ -1637,11 +1638,12 @@ $('recordTurntable').addEventListener('click', async () => {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${(currentModelName || 'model').replace(/\.[^.]+$/, '')}-turntable.webm`;
+    const extension = extensionFor(blob.type);
+    anchor.download = `${(currentModelName || 'model').replace(/\.[^.]+$/, '')}-turntable.${extension}`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
 
-    logExport('webm');
+    logExport(extension);
     toasts.info('Turntable recorded', formatBytes(blob.size));
   } catch (error) {
     if (error.name !== 'AbortError') {

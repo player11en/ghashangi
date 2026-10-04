@@ -92,7 +92,7 @@ export function markStyleTouched() {
 
 /**
  * Call on every export action that produces a downloadable file.
- * @param {'glb'|'png'|'webm'} type
+ * @param {'glb'|'png'|'webm'|'mp4'} type
  */
 export function logExport(type) {
   logEvent('export', { type, styleActive: styleTouched });

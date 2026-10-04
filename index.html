@@ -1059,6 +1059,13 @@
             <input type="range" id="cpDuration" min="3" max="15" step="1" value="8">
             <output for="cpDuration" id="cpDurationOut">8s</output>
           </div>
+          <div class="row">
+            <label for="clipFormat" title="MP4 plays on iOS and imports into editors. WebM has the widest browser support for recording.">Format</label>
+            <select id="clipFormat">
+              <option value="webm" selected>WebM</option>
+              <option value="mp4">MP4 (plays on iOS)</option>
+            </select>
+          </div>
           <div data-advanced class="row">
             <label for="cpAspect">Aspect</label>
             <select id="cpAspect">
@@ -1123,8 +1130,9 @@
           </div>
           <button type="button" id="recordTurntable" class="button">Record turntable</button>
           <p class="hint" id="turntableHint">
-            Records a WebM. Note that WebM cannot carry transparency — use the
-            colourway PNG export if you need an alpha channel.
+            Records MP4 where the browser supports it, WebM otherwise. Neither
+            carries transparency — use the colourway PNG export if you need an
+            alpha channel.
           </p>
           </div>
         </section>

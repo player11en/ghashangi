@@ -430,6 +430,59 @@ await page.evaluate(() => {
 await settle();
 check('Outline colour is a real dial', (await viewportHash()) !== outlineOn);
 
+// Measured in pixels rather than by hash, and that distinction is the point.
+// OutlinePass composites additively, so a black line added nothing and was
+// invisible - yet it still nudged a few pixel values, which is enough to pass
+// a "the hash changed" check. A user found it by looking. These count pixels
+// made substantially darker, which an invisible line cannot fake.
+async function pixelData() {
+  return page.evaluate(async () => {
+    const blob = await window.__viewer.captureScreenshot({ scale: 1 });
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+    return [...ctx.getImageData(0, 0, bitmap.width, bitmap.height).data];
+  });
+}
+function countDarkened(before, after) {
+  let n = 0;
+  for (let i = 0; i < before.length; i += 4) {
+    const a = before[i] + before[i + 1] + before[i + 2];
+    const b = after[i] + after[i + 1] + after[i + 2];
+    if (b < a - 60) n++;
+  }
+  return n;
+}
+
+// Strength 0 as the reference, rather than outline off: it keeps the composer
+// and every other pass exactly as they are, so the only difference between
+// the two captures is the line itself.
+await page.evaluate(() => window.__viewer.post.setOutlineStrength(0));
+await settle();
+const noOutline = await pixelData();
+
+await page.evaluate(() => {
+  const p = window.__viewer.post;
+  p.setOutlineColor('#000000');
+  p.setOutlineThickness(3);
+  p.setOutlineStrength(3);
+});
+await settle();
+const black3 = countDarkened(noOutline, await pixelData());
+check('a black outline actually darkens the silhouette', black3 > 500, `${black3} pixels darkened`);
+
+// Widening blurs the edge, which spreads the same coverage thinner - so before
+// strength was scaled by width, width 6 darkened FEWER pixels than width 3 and
+// the line visibly broke up. Dragging width up must make the line bolder.
+await page.evaluate(() => window.__viewer.post.setOutlineThickness(6));
+await settle();
+const black6 = countDarkened(noOutline, await pixelData());
+check('a wider outline is bolder, not fainter', black6 > black3, `width 3: ${black3}, width 6: ${black6}`);
+
+await page.evaluate(() => window.__viewer.post.setOutlineThickness(1.5));
+await settle();
+
 await page.evaluate(() => window.__viewer.post.setOutlineColor('#101018'));
 await settle();
 await page.evaluate(async () => { await window.__viewer.post.setDither(true); });

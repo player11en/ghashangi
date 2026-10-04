@@ -237,7 +237,7 @@ export function createCameraPath({ viewer, onChange = () => {}, onTick = () => {
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<Blob>} a .webm
  */
-export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onProgress, signal }) {
+export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onProgress, signal, format }) {
   if (cameraPath.waypoints.length < 1) {
     return Promise.reject(new Error('Add a waypoint before recording.'));
   }
@@ -250,6 +250,7 @@ export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onPro
     viewer,
     duration,
     fps,
+    format,
     holdKey: 'cameraPath',
     onSetup() {
       const wasAutoRotating = viewer.isAutoRotating();
@@ -291,11 +292,12 @@ export function recordCameraPath({ cameraPath, viewer, duration, fps = 30, onPro
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<Blob>} a .webm
  */
-export function recordStatic({ viewer, duration, fps = 30, onProgress, signal, onTick }) {
+export function recordStatic({ viewer, duration, fps = 30, onProgress, signal, onTick, format }) {
   return recordClip({
     viewer,
     duration,
     fps,
+    format,
     holdKey: 'cameraPath',
     // The camera holds still, but keyframed parameters still need the clock -
     // a locked-off shot with an animated hue is exactly what this is for.

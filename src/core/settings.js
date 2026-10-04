@@ -103,6 +103,7 @@ const FIELDS = [
   { id: 'ditherStrength', kind: 'range' },
   { id: 'cpDuration', kind: 'range' },
   { id: 'cpAspect', kind: 'select' },
+  { id: 'clipFormat', kind: 'select' },
   { id: 'lutToggle', kind: 'checkbox' },
   { id: 'lutPreset', kind: 'select' },
   { id: 'lutIntensity', kind: 'range' },

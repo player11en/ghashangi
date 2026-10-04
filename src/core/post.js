@@ -53,7 +53,7 @@
 // unmodified, for the whole call, and each pass does the right thing on its
 // own by construction.
 
-import { Vector2 } from 'three';
+import { Vector2, CustomBlending, OneFactor, OneMinusSrcAlphaFactor, AddEquation } from 'three';
 import { createCrtShader, applyCrtPreset } from './passes/crt-pass.js';
 import { createPaletteShader, applyPalette } from './passes/palette-pass.js';
 import { createRepeatShader, setRepeatMode } from './passes/repeat-pass.js';
@@ -276,6 +276,36 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     outlinePass.edgeGlow = 0;
     outlinePass.pulsePeriod = 0;
     outlinePass.usePatternTexture = false;
+
+    // Composite the line OVER the image instead of adding it.
+    //
+    // OutlinePass draws its edges with AdditiveBlending, which is the right
+    // call for what it was built for - a glowing selection highlight in an
+    // editor - and the wrong one for a drawn outline: adding black adds
+    // nothing, so a black line was invisible and any dark colour (including
+    // this app's own near-black default) barely registered. Reported directly:
+    // every colour worked except black.
+    //
+    // The edge shader already writes premultiplied colour - rgb is the line
+    // colour times edge coverage, alpha is the coverage - so the correct
+    // operator is premultiplied-over, src + dst * (1 - srcAlpha). Dark lines
+    // now darken, light lines now paint, and neither depends on what is
+    // underneath.
+    const overlay = outlinePass.overlayMaterial;
+    overlay.blending = CustomBlending;
+    overlay.blendEquation = AddEquation;
+    overlay.blendSrc = OneFactor;
+    overlay.blendDst = OneMinusSrcAlphaFactor;
+    // Clamped because edgeStrength scales the result above 1, and the
+    // composer's half-float targets are not clamped before blending - an alpha
+    // of 3 would make (1 - alpha) negative and punch dark holes through the
+    // image instead of drawing a line. Saturating at 1 turns strength into
+    // "how solid the line is", which is what the slider should mean anyway.
+    overlay.fragmentShader = overlay.fragmentShader.replace(
+      'gl_FragColor = finalColor;',
+      'gl_FragColor = clamp(finalColor, 0.0, 1.0);',
+    );
+    overlay.needsUpdate = true;
     composer.addPass(outlinePass);
     applyOutline();
 
@@ -421,7 +451,17 @@ export function createPostProcessing({ renderer, scene, camera, invalidate }) {
     // bug when the intent is a drawn line.
     outlinePass.hiddenEdgeColor.set(outlineColor);
     outlinePass.edgeThickness = outlineThickness;
-    outlinePass.edgeStrength = outlineStrength;
+    // Strength scaled by width, so widening the line does not fade it.
+    //
+    // OutlinePass widens an edge by blurring it, which spreads the same
+    // coverage over more pixels - so at a fixed strength a wider line gets
+    // fainter, not bolder. Measured: at strength 3, width 3 darkened 2802
+    // pixels and width 6 darkened only 1199, and the line visibly broke up.
+    // Dragging "width" up and watching the outline disappear is the opposite
+    // of what the control promises. Compensating here keeps width meaning
+    // width and strength meaning solidity; the overlay clamps at 1, so a
+    // large product just saturates into a solid line rather than overflowing.
+    outlinePass.edgeStrength = outlineStrength * Math.max(1, outlineThickness);
   }
 
   function applyAfterimage() {

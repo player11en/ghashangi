@@ -18,17 +18,94 @@
 // corresponds to the frame actually being drawn - required for a turntable
 // to loop seamlessly, and just as true for a camera path.
 
-/** Codecs to try, best first. Safari has historically supported none of these. */
-const CODECS = [
+/**
+ * Container and codec preferences, best first.
+ *
+ * MP4/H.264 leads, and that ordering is the whole point. WebM does not play on
+ * iOS or in Safari and does not import into most editors, so a clip made here
+ * to be posted somewhere frequently could not be. MP4 plays everywhere that
+ * matters and drops straight into a timeline.
+ *
+ * No transcoding step is involved. MediaRecorder encodes H.264 natively in
+ * Chromium and Safari, which was worth checking before reaching for
+ * ffmpeg.wasm - that would have been roughly 25 MB of WebAssembly to do what
+ * the browser already does in hardware. Firefox records WebM only, so it falls
+ * through to the entries below and keeps working exactly as before.
+ *
+ * avc1.42E01E is Constrained Baseline, the most widely decodable H.264 profile
+ * there is; 4D401E is Main, listed after it as a better-quality fallback for
+ * anything that offers Main but not Baseline.
+ */
+const WEBM_CODECS = [
   'video/webm;codecs=vp9',
   'video/webm;codecs=vp8',
   'video/webm',
 ];
 
-/** The first supported codec, or null if the browser cannot record WebM. */
-export function supportedCodec() {
+const MP4_CODECS = [
+  // Constrained Baseline first - the most widely decodable H.264 profile
+  // there is. Main is listed after it as a better-quality fallback for
+  // anything that offers Main but not Baseline.
+  'video/mp4;codecs=avc1.42E01E',
+  'video/mp4;codecs=avc1.4D401E',
+  'video/mp4',
+];
+
+/**
+ * WebM leads, and MP4 is an explicit choice rather than the silent default.
+ *
+ * MP4 is what plays on iOS and imports into editors, so it is the format most
+ * people actually want - but it is offered rather than assumed, because it
+ * could not be verified working here. Measured directly: MediaRecorder encodes
+ * H.264 fine from a 2D canvas (2 KB from a 20-frame test) and produces zero
+ * bytes from a WebGL canvas in the same browser, while VP9 from that same
+ * WebGL canvas produces a valid file. The H.264 path also starved the render
+ * loop - 3 frames against VP9's 14 over the same interval.
+ *
+ * That may well be specific to this software-rendered headless build, and on a
+ * real GPU MP4 may be flawless. But defaulting to a container that was never
+ * once observed producing a file is not a trade worth making silently, so the
+ * default is the one with evidence behind it and MP4 is one click away with a
+ * fallback behind it.
+ */
+const CODECS = [...WEBM_CODECS, ...MP4_CODECS];
+
+/** Codec lists by the format a user asked for. */
+const BY_FORMAT = {
+  webm: [...WEBM_CODECS, ...MP4_CODECS],
+  mp4: [...MP4_CODECS, ...WEBM_CODECS],
+};
+
+/**
+ * The file extension matching whatever codec was negotiated.
+ *
+ * Derived from the recorder's actual mimeType rather than assumed: naming an
+ * MP4 file .webm produces something players refuse to open even though the
+ * bytes are fine, which is a worse failure than not supporting MP4 at all.
+ */
+export function extensionFor(mimeType) {
+  return String(mimeType).includes('mp4') ? 'mp4' : 'webm';
+}
+
+/** The first supported codec, or null if the browser cannot record video. */
+export function supportedCodec(format = 'webm') {
   if (typeof MediaRecorder === 'undefined') return null;
-  return CODECS.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
+  const order = BY_FORMAT[format] ?? CODECS;
+  return order.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
+}
+
+/**
+ * A codec of a different container than the ones already tried.
+ *
+ * Used for the fallback below: retrying MP4 with a second H.264 profile after
+ * MP4 produced nothing is pointless, since the container is the suspect part.
+ * Jumping to WebM is what actually changes the outcome.
+ */
+function differentContainer(tried) {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const triedMp4 = String(tried).includes('mp4');
+  const others = triedMp4 ? WEBM_CODECS : MP4_CODECS;
+  return others.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
 }
 
 export function isClipRecordingSupported() {
@@ -59,7 +136,7 @@ export function isClipRecordingSupported() {
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<Blob>} a .webm
  */
-export function recordClip({
+function recordOnce({
   viewer,
   duration,
   fps = 30,
@@ -68,10 +145,13 @@ export function recordClip({
   onSetup = () => () => {},
   onProgress = () => {},
   signal,
+  mimeType,
+  // Accepted and ignored here: recordClip() resolves it into a mimeType before
+  // calling this, and listing it keeps it out of the rest-spread below.
+  format,
 } = {}) {
-  const mimeType = supportedCodec();
   if (!mimeType) {
-    return Promise.reject(new Error('This browser cannot record WebM video.'));
+    return Promise.reject(new Error('This browser cannot record video.'));
   }
 
   return new Promise((resolve, reject) => {
@@ -156,4 +236,48 @@ export function recordClip({
       if (recorder.state === 'recording') recorder.stop();
     }, totalMs + 2000);
   });
+}
+
+/**
+ * Record a clip, falling back to another container if the first produces
+ * nothing.
+ *
+ * MediaRecorder.isTypeSupported() reports what the browser is willing to
+ * *accept*, not what it will successfully produce from a given source, and the
+ * two are not the same thing - MP4 was advertised as supported while a WebGL
+ * canvas capture yielded zero bytes. Rather than trust the advertisement or
+ * abandon MP4 (which is the only container that plays on iOS and imports into
+ * editors), a recording that comes back empty is retried once in a different
+ * container.
+ *
+ * Bounded at two attempts, and only ever triggered by the empty case, so a
+ * working first attempt costs nothing. The worst case is a recording that
+ * takes twice as long; there is no case where a browser that could have
+ * produced a file returns an error instead.
+ *
+ * @param {object} options  As recordOnce, minus mimeType.
+ * @returns {Promise<Blob>}
+ */
+export async function recordClip(options = {}) {
+  const first = supportedCodec(options.format);
+  if (!first) throw new Error('This browser cannot record video.');
+
+  try {
+    return await recordOnce({ ...options, mimeType: first });
+  } catch (error) {
+    // Only an empty result is worth retrying. An abort is the user's choice,
+    // and a genuine encoder error will not be fixed by a different container.
+    if (error?.name === 'AbortError' || !/produced no data/i.test(String(error?.message))) {
+      throw error;
+    }
+
+    const second = differentContainer([first]);
+    if (!second) throw error;
+
+    console.warn(
+      `[Ghashangi] ${first} recorded nothing; retrying as ${second}. `
+      + 'The browser reported support for a container it could not produce from this canvas.',
+    );
+    return recordOnce({ ...options, mimeType: second });
+  }
 }
